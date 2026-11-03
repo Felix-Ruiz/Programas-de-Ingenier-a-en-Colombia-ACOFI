@@ -18,7 +18,6 @@ import {
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
 
-// LISTA COMPLETA DE FUENTES ESTILO MICROSOFT WORD PARA RENDERIZADO PÚBLICO
 const NOMBRES_FUENTES_WORD: Record<string, { label: string; family: string }> = {
   'arial': { label: 'Arial', family: 'Arial, Helvetica, sans-serif' },
   'arial-black': { label: 'Arial Black', family: '"Arial Black", Gadget, sans-serif' },
@@ -40,7 +39,7 @@ const NOMBRES_FUENTES_WORD: Record<string, { label: string; family: string }> = 
   'lucida-sans-unicode': { label: 'Lucida Sans', family: '"Lucida Sans Unicode", "Lucida Grande", sans-serif' },
   'palatino-linotype': { label: 'Palatino Linotype', family: '"Palatino Linotype", "Book Antiqua", Palatino, serif' },
   'segoe-ui': { label: 'Segoe UI', family: '"Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif' },
-  'tahoma': { label: 'Tahoma, Geneva, Verdana, sans-serif', family: 'Tahoma, Geneva, Verdana, sans-serif' },
+  'tahoma': { label: 'Tahoma', family: 'Tahoma, Geneva, Verdana, sans-serif' },
   'times-new-roman': { label: 'Times New Roman', family: '"Times New Roman", Times, Baskerville, Georgia, serif' },
   'trebuchet-ms': { label: 'Trebuchet MS', family: '"Trebuchet MS", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Tahoma, sans-serif' },
   'verdana': { label: 'Verdana', family: 'Verdana, Geneva, sans-serif' }
@@ -53,7 +52,9 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
   .ql-size-large { font-size: 1.5em; }
   .ql-size-huge { font-size: 2.25em; }
   .ql-align-center { text-align: center; }
+  .ql-align-center img { margin-left: auto !important; margin-right: auto !important; display: block !important; }
   .ql-align-right { text-align: right; }
+  .ql-align-right img { margin-left: auto !important; margin-right: 0 !important; display: block !important; }
   .ql-align-justify { text-align: justify; }
   a[data-inline-btn="true"]:hover {
     transform: scale(1.05) !important;
@@ -80,9 +81,32 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
   .prose img {
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
-    border-radius: 0.75rem;
     max-width: 100% !important;
     height: auto !important;
+  }
+  .prose img[data-borde="cuadrado"], img[data-borde="cuadrado"] {
+    border-radius: 0px !important;
+  }
+  .prose img[data-borde="redondeado"], img[data-borde="redondeado"] {
+    border-radius: 14px !important;
+  }
+  .prose img[data-borde="circular"], img[data-borde="circular"] {
+    border-radius: 9999px !important;
+  }
+  .prose img[data-alineacion="izquierda"], img[data-alineacion="izquierda"] {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+  .prose img[data-alineacion="centro"], img[data-alineacion="centro"] {
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  .prose img[data-alineacion="derecha"], img[data-alineacion="derecha"] {
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
   }
   .prose p, .prose li, .prose div {
     margin-top: 0 !important;
@@ -102,10 +126,12 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
   }
   @media print {
     @page {
-      size: A4 portrait;
-      margin: 12mm;
+      size: A4 landscape;
+      margin: 10mm;
     }
-    body {
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       background: #fdfbf7 !important;
@@ -113,21 +139,30 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
     .no-print {
       display: none !important;
     }
+    .print-book-wrapper {
+      display: block !important;
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
     .print-page-sheet {
-      page-break-after: always;
-      break-after: page;
-      min-height: 265mm;
-      padding: 10mm 8mm;
-      box-sizing: border-box;
-      position: relative;
+      page-break-after: always !important;
+      break-after: page !important;
+      min-height: 185mm !important;
+      width: 100% !important;
+      padding: 12mm 14mm !important;
+      box-sizing: border-box !important;
+      position: relative !important;
+      overflow: visible !important;
     }
     .print-page-sheet:last-child {
-      page-break-after: auto;
-      break-after: auto;
+      page-break-after: auto !important;
+      break-after: auto !important;
     }
     .print-avoid-break {
-      page-break-inside: avoid;
-      break-inside: avoid;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
   }
 `;
@@ -151,11 +186,14 @@ type ItemFirma = {
   cargo: string;
   infoAdicional?: string;
   tamanoFirma?: number;
+  espacioSuperior?: number;
 };
 
 type BloqueFirma = BloqueBase & {
   tipo: 'firma';
   alineacion: 'izquierda' | 'centro' | 'derecha' | 'espaciado';
+  espacioGeneralSuperior?: number;
+  espacioGeneralInferior?: number;
   firmas: ItemFirma[];
 };
 
@@ -453,8 +491,8 @@ function LibroPublicoContent() {
       window.print();
       setTimeout(() => {
         setGenerandoPdfPublico(false);
-      }, 600);
-    }, 1100);
+      }, 800);
+    }, 1400);
   };
 
   const mapaTablasPorId = useMemo(() => {
@@ -1112,7 +1150,7 @@ function LibroPublicoContent() {
                     <feDropShadow dx="0" dy="14" stdDeviation="8" floodColor="#0f172a" floodOpacity="0.35" />
                   </filter>
                 </defs>
-                {/* Capa de profundidad 3D: legendType="none" y tooltipType="none" evitan que duplique los nombres en la leyenda */}
+                {/* legendType="none" y tooltipType="none" evitan que la capa 3D duplique los nombres en la leyenda */}
                 <Pie
                   data={datos}
                   cx="50%"
@@ -1393,19 +1431,15 @@ function LibroPublicoContent() {
     }
   };
 
-  // RENDERIZADOR INFALIBLE: CONVIERTE &nbsp; ENTRE PALABRAS EN ESPACIOS NORMALES PARA QUE LOS TEXTOS NUNCA SE CORTEN EN EL BORDE
+  // RENDERIZADOR INFALIBLE: CONVIERTE &nbsp; EN ESPACIOS NORMALES Y CONSERVA ESTILOS DE IMÁGENES EN TEXTO Y BOTONES
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
 
-    // 1. Reemplazar todos los &nbsp; por espacios normales primero para permitir el salto de línea (word-wrap) natural
     const htmlSinNbsp = html.replace(/&nbsp;|&#160;|\u00A0/gi, ' ');
-
-    // 2. Preservar únicamente los párrafos vacíos intencionales (<p><br></p>)
     const htmlConSaltosPreservados = htmlSinNbsp
       .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
       .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
 
-    // 3. Transformar etiquetas [[BOTON|...]] en botones estilizados
     return htmlConSaltosPreservados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
       const limpio = String(contenidoInterno)
         .replace(/<[^>]*>/g, '')
@@ -1479,7 +1513,7 @@ function LibroPublicoContent() {
 
   return (
     <div 
-      className="h-screen w-screen overflow-hidden text-stone-900 font-serif relative transition-colors duration-300" 
+      className={`${generandoPdfPublico ? 'min-h-screen w-full overflow-visible block' : 'h-screen w-screen overflow-hidden relative'} text-stone-900 font-serif transition-colors duration-300`} 
       style={{ backgroundColor: colorFondoApp }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -1488,14 +1522,18 @@ function LibroPublicoContent() {
     >
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_FUENTES_PUBLICO }} />
 
-      {/* VISTA DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF */}
+      {/* MODO DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF (FLUJO NATIVO PARA QUE IMPRIMA LAS 120 HOJAS CON EL DISEÑO REAL DEL LIBRO) */}
       {generandoPdfPublico && (
-        <div className="fixed inset-0 z-99999 bg-[#fdfbf7] overflow-y-auto p-10 font-serif text-stone-900">
-          <div className="max-w-4xl mx-auto space-y-12">
+        <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
+          <div className="max-w-5xl mx-auto">
             {secciones.map((sec, sIdx) => {
               if (sec.tipo === 'portada') {
                 return (
-                  <div key={`pdf-portada-${sIdx}`} className="print-page-sheet flex flex-col items-center justify-center text-center px-10" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
+                  <div 
+                    key={`pdf-portada-${sIdx}`} 
+                    className="print-page-sheet flex flex-col items-center justify-center text-center px-10 relative" 
+                    style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}
+                  >
                     {configuracion.logoUrl && (
                       <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
                     )}
@@ -1523,13 +1561,21 @@ function LibroPublicoContent() {
               const tieneSub = (p.subtitulo || '').trim() !== '';
               const mostrarNum = p.mostrarNumero !== false && tieneT;
 
+              const cabeceraMostrarPdf = !textoVacioQuill(p.cabeceraHtml)
+                ? p.cabeceraHtml
+                : (configuracion.mostrarCabeceraGlobal && !textoVacioQuill(configuracion.cabeceraGlobalHtml) ? configuracion.cabeceraGlobalHtml : '');
+
+              const pieMostrarPdf = !textoVacioQuill(p.piePaginaHtml)
+                ? p.piePaginaHtml
+                : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
+
               return (
                 <div key={`pdf-pag-${p.id}`} className="print-page-sheet flex flex-col" style={{ backgroundColor: p.colorFondo || '#fdfbf7' }}>
-                  {!textoVacioQuill(p.cabeceraHtml) && (
-                    <div className="mb-6 pb-3 border-b border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(p.cabeceraHtml || '') }} />
+                  {cabeceraMostrarPdf && (
+                    <div className="mb-6 pb-3 border-b border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-80" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrarPdf) }} />
                   )}
                   {(tieneT || tieneSub) && (
-                    <div className="mb-8 border-b border-stone-200 pb-4 print-avoid-break">
+                    <div className="mb-8 border-b border-stone-200/60 pb-4 print-avoid-break">
                       <div className="flex items-center gap-4">
                         {mostrarNum && <span className="text-4xl font-black opacity-30">{sec.numeroReal}.</span>}
                         {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
@@ -1542,34 +1588,81 @@ function LibroPublicoContent() {
                       <div key={b.id} className="w-full print-avoid-break">
                         {b.tipo === 'texto' && (
                           b.columnas === 2 || b.columnas === 3 ? (
-                            <div className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} items-start`}>
-                              <div className="prose prose-stone text-sm" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
-                              <div className="prose prose-stone text-sm border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
-                              {b.columnas === 3 && <div className="prose prose-stone text-sm border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
+                            <div 
+                              className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
+                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                            >
+                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
+                              {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
                             </div>
                           ) : (
-                            <div className="prose prose-stone text-sm text-justify" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                            <div 
+                              className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
+                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                              dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
+                            />
                           )
                         )}
                         {b.tipo === 'firma' && (
-                          <div className={`flex flex-wrap gap-8 items-end py-4 ${b.alineacion === 'centro' ? 'justify-center text-center' : b.alineacion === 'derecha' ? 'justify-end text-right' : 'justify-around text-left'}`}>
+                          <div 
+                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-12 items-end ${
+                              b.alineacion === 'centro' ? 'justify-center text-center' :
+                              b.alineacion === 'derecha' ? 'justify-end text-right' :
+                              b.alineacion === 'espaciado' ? 'justify-around text-left' :
+                              'justify-start text-left'
+                            }`}
+                            style={{ 
+                              backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
+                              paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
+                              paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
+                            }}
+                          >
                             {(b.firmas || []).map((f, i) => (
-                              <div key={i} className="flex flex-col space-y-1">
-                                {f.url && <img src={f.url} alt={f.nombre} style={{ height: `${f.tamanoFirma ?? 60}px` }} className="w-auto object-contain mb-1" />}
-                                <span className="font-sans font-bold text-stone-900 text-sm">{f.nombre}</span>
-                                <span className="font-sans text-stone-600 text-xs">{f.cargo}</span>
-                                {f.infoAdicional && <span className="font-sans text-stone-500 text-[11px] italic">{f.infoAdicional}</span>}
+                              <div 
+                                key={i} 
+                                className="flex flex-col space-y-1 min-w-52"
+                                style={{ marginTop: `${f.espacioSuperior ?? 0}px` }}
+                              >
+                                {f.url && (
+                                  <div className={`mb-2 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                    <img 
+                                      src={f.url} 
+                                      alt={f.nombre} 
+                                      style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
+                                      className="object-contain" 
+                                    />
+                                  </div>
+                                )}
+                                <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
+                                {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
+                                {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
                               </div>
                             ))}
                           </div>
                         )}
+                        {b.tipo === 'boton' && (
+                          <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                            <span
+                              style={{
+                                backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
+                                color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
+                                borderColor: b.colorBoton,
+                                boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
+                              }}
+                              className={`px-7 py-3 font-sans font-black text-xs uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
+                            >
+                              {b.texto}
+                            </span>
+                          </div>
+                        )}
                         {b.tipo === 'tabla' && !b.oculto && (
-                          <div className="border border-stone-300 rounded-xl overflow-hidden my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
                             <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase">{b.nombre}</div>
-                            <table className="w-full text-xs font-sans border-collapse">
+                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 13}px` }}>
                               <thead>
                                 <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
-                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold text-left">{c}</th>)}
+                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-stone-200">
@@ -1584,7 +1677,7 @@ function LibroPublicoContent() {
                           </div>
                         )}
                         {b.tipo === 'grafica' && (
-                          <div className="border border-stone-200 rounded-xl p-6 my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                          <div className="border border-stone-200 rounded-2xl p-6 my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
                             <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
                             {renderizarGrafica(b)}
                             {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
@@ -1598,6 +1691,9 @@ function LibroPublicoContent() {
                       </div>
                     ))}
                   </div>
+                  {pieMostrarPdf && (
+                    <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrarPdf) }} />
+                  )}
                 </div>
               );
             })}
@@ -1606,7 +1702,7 @@ function LibroPublicoContent() {
       )}
 
       {/* LOGO SUPERIOR GLOBAL */}
-      {configuracion.logoUrl && (
+      {configuracion.logoUrl && !generandoPdfPublico && (
         <div className="absolute top-6 left-6 md:top-8 md:left-12 z-40 pointer-events-none no-print">
           <img 
             src={configuracion.logoUrl} 
@@ -1620,71 +1716,73 @@ function LibroPublicoContent() {
         </div>
       )}
 
-      {/* BARRA FLOTANTE SUPERIOR DERECHA: SELECTOR DE EDICIÓN, DESCARGAR LIBRO PDF, COMPARTIR, PANTALLA COMPLETA Y BUSCADOR */}
-      <div className="absolute top-5 right-5 md:top-7 md:right-10 z-40 flex flex-wrap items-center justify-end gap-2 no-print">
-        
-        {edicionesDisponibles.length > 1 && (
-          <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-xl border border-stone-200/90 px-3 py-2 rounded-full shadow-sm font-sans text-xs font-bold text-stone-700">
-            <Calendar size={13} className="text-stone-400" />
-            <select
-              value={edicionActiva.anio}
-              onChange={(e) => router.push(`/?edicion=${e.target.value}`)}
-              className="bg-transparent outline-none cursor-pointer font-black text-stone-800"
-              title="Cambiar de edición anual"
-            >
-              {edicionesDisponibles.map(ed => (
-                <option key={ed.id} value={ed.anio}>Edición {ed.anio}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      {/* BARRA FLOTANTE SUPERIOR DERECHA */}
+      {!generandoPdfPublico && (
+        <div className="absolute top-5 right-5 md:top-7 md:right-10 z-40 flex flex-wrap items-center justify-end gap-2 no-print">
+          
+          {edicionesDisponibles.length > 1 && (
+            <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-xl border border-stone-200/90 px-3 py-2 rounded-full shadow-sm font-sans text-xs font-bold text-stone-700">
+              <Calendar size={13} className="text-stone-400" />
+              <select
+                value={edicionActiva.anio}
+                onChange={(e) => router.push(`/?edicion=${e.target.value}`)}
+                className="bg-transparent outline-none cursor-pointer font-black text-stone-800"
+                title="Cambiar de edición anual"
+              >
+                {edicionesDisponibles.map(ed => (
+                  <option key={ed.id} value={ed.anio}>Edición {ed.anio}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-        <button
-          type="button"
-          onClick={descargarLibroCompletoPdf}
-          disabled={generandoPdfPublico}
-          className="flex items-center gap-2 bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-emerald-600 text-stone-700 hover:text-emerald-700 px-3.5 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold cursor-pointer"
-          title="Descargar el libro completo en PDF"
-        >
-          <Printer size={14} className="text-emerald-600" />
-          <span className="hidden md:inline">{generandoPdfPublico ? 'Preparando PDF...' : 'Descargar PDF'}</span>
-        </button>
+          <button
+            type="button"
+            onClick={descargarLibroCompletoPdf}
+            disabled={generandoPdfPublico}
+            className="flex items-center gap-2 bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-emerald-600 text-stone-700 hover:text-emerald-700 px-3.5 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold cursor-pointer"
+            title="Descargar el libro completo en PDF"
+          >
+            <Printer size={14} className="text-emerald-600" />
+            <span className="hidden md:inline">{generandoPdfPublico ? 'Preparando PDF...' : 'Descargar PDF'}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={compartirPaginaActual}
-          className="flex items-center gap-1.5 bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-blue-600 text-stone-700 hover:text-blue-700 px-3 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold cursor-pointer"
-          title="Copiar enlace directo a esta página"
-        >
-          {enlaceCompartido ? <Check size={14} className="text-emerald-600" /> : <Share2 size={14} />}
-          {enlaceCompartido && <span className="text-[11px] text-emerald-700">¡Enlace copiado!</span>}
-        </button>
+          <button
+            type="button"
+            onClick={compartirPaginaActual}
+            className="flex items-center gap-1.5 bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-blue-600 text-stone-700 hover:text-blue-700 px-3 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold cursor-pointer"
+            title="Copiar enlace directo a esta página"
+          >
+            {enlaceCompartido ? <Check size={14} className="text-emerald-600" /> : <Share2 size={14} />}
+            {enlaceCompartido && <span className="text-[11px] text-emerald-700">¡Enlace copiado!</span>}
+          </button>
 
-        <button
-          type="button"
-          onClick={alternarPantallaCompleta}
-          className="hidden sm:flex items-center justify-center bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-stone-400 text-stone-700 p-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all cursor-pointer"
-          title="Modo Pantalla Completa"
-        >
-          {esPantallaCompleta ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
+          <button
+            type="button"
+            onClick={alternarPantallaCompleta}
+            className="hidden sm:flex items-center justify-center bg-white/85 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-stone-400 text-stone-700 p-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all cursor-pointer"
+            title="Modo Pantalla Completa"
+          >
+            {esPantallaCompleta ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setBuscadorAbierto(true)}
-          className="flex items-center gap-2.5 bg-white/90 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-blue-600 text-stone-700 hover:text-blue-700 px-4 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold group cursor-pointer"
-          title="Buscar ingeniería, tabla, ciudad o ir a cualquier página (Ctrl + K)"
-        >
-          <Search size={15} className="text-stone-400 group-hover:text-blue-600 transition-colors" />
-          <span className="hidden sm:inline">Buscar en el libro...</span>
-          <kbd className="hidden lg:inline-block px-2 py-0.5 text-[10px] font-black bg-stone-100 text-stone-500 rounded-md border border-stone-200">
-            Ctrl K
-          </kbd>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setBuscadorAbierto(true)}
+            className="flex items-center gap-2.5 bg-white/90 hover:bg-white backdrop-blur-xl border border-stone-200/90 hover:border-blue-600 text-stone-700 hover:text-blue-700 px-4 py-2.5 rounded-full shadow-md shadow-stone-200/60 transition-all font-sans text-xs font-bold group cursor-pointer"
+            title="Buscar ingeniería, tabla, ciudad o ir a cualquier página (Ctrl + K)"
+          >
+            <Search size={15} className="text-stone-400 group-hover:text-blue-600 transition-colors" />
+            <span className="hidden sm:inline">Buscar en el libro...</span>
+            <kbd className="hidden lg:inline-block px-2 py-0.5 text-[10px] font-black bg-stone-100 text-stone-500 rounded-md border border-stone-200">
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
+      )}
 
       {/* MARCA DE AGUA CENTRAL */}
-      {mostrarMarcaAgua() && (
+      {mostrarMarcaAgua() && !generandoPdfPublico && (
         <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden no-print">
           <img 
             src={configuracion.marcaAguaUrl} 
@@ -1699,562 +1797,582 @@ function LibroPublicoContent() {
       )}
 
       {/* MOTOR VIRTUALIZADO ULTRARRÁPIDO: SOLO MONTA EN EL DOM LA PÁGINA ACTIVA */}
-      <AnimatePresence mode="wait" initial={false} custom={direccionTransicion}>
-        <motion.div
-          key={seccionActiva.tipo === 'portada' ? 'portada-principal' : seccionActiva.pagina.id}
-          custom={direccionTransicion}
-          variants={variantesVirtualizadas}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: 0.16, ease: 'easeOut' }}
-          className="h-full w-screen no-print"
-        >
-          {seccionActiva.tipo === 'portada' ? (
-            <div 
-              className="h-full w-screen shrink-0 flex flex-col items-center justify-center text-center px-6 md:px-20 relative overflow-y-auto overflow-x-hidden custom-scrollbar"
-            >
-              {configuracion.imagenFondoPortada && (
-                <div className="absolute inset-0 z-0">
-                  <img src={configuracion.imagenFondoPortada} alt="Fondo" className="w-full h-full object-cover" />
-                  <div 
-                    className="absolute inset-0 backdrop-blur-[2px]" 
-                    style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }}
-                  ></div>
-                </div>
-              )}
-
-              <div className="relative z-10 flex flex-col items-center w-full max-w-5xl mx-auto px-2">
-                <div className="w-16 h-1 mb-10 transition-colors" style={{ backgroundColor: edicionActiva.color_principal || '#1d4ed8' }}></div>
-                
-                {configuracion.portadaContenido ? (
-                  <div 
-                    className="text-center mx-auto w-full max-w-full wrap-break-word whitespace-normal overflow-hidden text-stone-900 prose prose-lg prose-stone [&_h1]:text-4xl [&_h1]:sm:text-5xl [&_h1]:md:text-6xl [&_h1]:lg:text-7xl [&_h1]:font-normal [&_h1]:tracking-tight [&_h1]:leading-[1.05] [&_h1]:mb-8 [&_h1]:wrap-break-word [&_p]:text-lg [&_p]:md:text-2xl [&_p]:font-serif [&_p]:mb-12 [&_p]:wrap-break-word"
-                    dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido) }} 
-                  />
-                ) : (
-                  <>
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight text-stone-900 w-full max-w-full wrap-break-word whitespace-normal leading-[1.05] mb-8">
-                      {edicionActiva.titulo || 'Programas de Ingeniería en Colombia'}
-                    </h1>
-                    <p className="text-lg md:text-2xl font-serif italic text-stone-500 max-w-2xl wrap-break-word whitespace-normal mb-16">
-                      {configuracion.subtitulo || 'Análisis oficial y directorio nacional de la educación superior en ingeniería.'}
-                    </p>
-                  </>
+      {!generandoPdfPublico && (
+        <AnimatePresence mode="wait" initial={false} custom={direccionTransicion}>
+          <motion.div
+            key={seccionActiva.tipo === 'portada' ? 'portada-principal' : seccionActiva.pagina.id}
+            custom={direccionTransicion}
+            variants={variantesVirtualizadas}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            className="h-full w-screen no-print"
+          >
+            {seccionActiva.tipo === 'portada' ? (
+              <div 
+                className="h-full w-screen shrink-0 flex flex-col items-center justify-center text-center px-6 md:px-20 relative overflow-y-auto overflow-x-hidden custom-scrollbar"
+              >
+                {configuracion.imagenFondoPortada && (
+                  <div className="absolute inset-0 z-0">
+                    <img src={configuracion.imagenFondoPortada} alt="Fondo" className="w-full h-full object-cover" />
+                    <div 
+                      className="absolute inset-0 backdrop-blur-[2px]" 
+                      style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }}
+                    ></div>
+                  </div>
                 )}
 
-                <div className="flex flex-col items-center">
-                  <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400 mb-4">ACOFI / Edición Oficial {edicionActiva.anio}</span>
-                  <BookOpen size={24} style={{ color: edicionActiva.color_principal || '#1d4ed8' }} />
+                <div className="relative z-10 flex flex-col items-center w-full max-w-5xl mx-auto px-2">
+                  <div className="w-16 h-1 mb-10 transition-colors" style={{ backgroundColor: edicionActiva.color_principal || '#1d4ed8' }}></div>
+                  
+                  {configuracion.portadaContenido ? (
+                    <div 
+                      className="text-center mx-auto w-full max-w-full wrap-break-word whitespace-normal overflow-hidden text-stone-900 prose prose-lg prose-stone [&_h1]:text-4xl [&_h1]:sm:text-5xl [&_h1]:md:text-6xl [&_h1]:lg:text-7xl [&_h1]:font-normal [&_h1]:tracking-tight [&_h1]:leading-[1.05] [&_h1]:mb-8 [&_h1]:wrap-break-word [&_p]:text-lg [&_p]:md:text-2xl [&_p]:font-serif [&_p]:mb-12 [&_p]:wrap-break-word"
+                      dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido) }} 
+                    />
+                  ) : (
+                    <>
+                      <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-normal tracking-tight text-stone-900 w-full max-w-full wrap-break-word whitespace-normal leading-[1.05] mb-8">
+                        {edicionActiva.titulo || 'Programas de Ingeniería en Colombia'}
+                      </h1>
+                      <p className="text-lg md:text-2xl font-serif italic text-stone-500 max-w-2xl wrap-break-word whitespace-normal mb-16">
+                        {configuracion.subtitulo || 'Análisis oficial y directorio nacional de la educación superior en ingeniería.'}
+                      </p>
+                    </>
+                  )}
+
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400 mb-4">ACOFI / Edición Oficial {edicionActiva.anio}</span>
+                    <BookOpen size={24} style={{ color: edicionActiva.color_principal || '#1d4ed8' }} />
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (() => {
-            const pagina = seccionActiva.pagina;
-            const tieneTitulo = pagina.titulo.trim() !== '';
-            const tieneSubtitulo = (pagina.subtitulo || '').trim() !== '';
-            const mostrarNum = pagina.mostrarNumero !== false && tieneTitulo;
+            ) : (() => {
+              const pagina = seccionActiva.pagina;
+              const tieneTitulo = pagina.titulo.trim() !== '';
+              const tieneSubtitulo = (pagina.subtitulo || '').trim() !== '';
+              const mostrarNum = pagina.mostrarNumero !== false && tieneTitulo;
 
-            const cabeceraMostrar = !textoVacioQuill(pagina.cabeceraHtml)
-              ? pagina.cabeceraHtml
-              : (configuracion.mostrarCabeceraGlobal && !textoVacioQuill(configuracion.cabeceraGlobalHtml) ? configuracion.cabeceraGlobalHtml : '');
+              const cabeceraMostrar = !textoVacioQuill(pagina.cabeceraHtml)
+                ? pagina.cabeceraHtml
+                : (configuracion.mostrarCabeceraGlobal && !textoVacioQuill(configuracion.cabeceraGlobalHtml) ? configuracion.cabeceraGlobalHtml : '');
 
-            const pieMostrar = !textoVacioQuill(pagina.piePaginaHtml)
-              ? pagina.piePaginaHtml
-              : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
+              const pieMostrar = !textoVacioQuill(pagina.piePaginaHtml)
+                ? pagina.piePaginaHtml
+                : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
 
-            return (
-              <div className="h-full w-screen shrink-0 flex flex-col px-6 sm:px-12 md:px-24 lg:px-32 py-24 overflow-y-auto overflow-x-hidden custom-scrollbar relative z-10">
-                <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col min-w-0">
-                  
-                  {cabeceraMostrar && (
-                    <div 
-                      className="mb-8 pb-4 border-b border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-80"
-                      dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }}
-                    />
-                  )}
+              return (
+                <div className="h-full w-screen shrink-0 flex flex-col px-6 sm:px-12 md:px-24 lg:px-32 py-24 overflow-y-auto overflow-x-hidden custom-scrollbar relative z-10">
+                  <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col min-w-0">
+                    
+                    {cabeceraMostrar && (
+                      <div 
+                        className="mb-8 pb-4 border-b border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-80"
+                        dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }}
+                      />
+                    )}
 
-                  {(tieneTitulo || tieneSubtitulo) && (
-                    <div className="mb-12 border-b border-stone-200/50 pb-6 relative z-10">
-                      <div className="flex items-center gap-4">
-                        {mostrarNum && (
-                          <span className="text-5xl font-black opacity-30">{seccionActiva.numeroReal}.</span>
-                        )}
-                        {tieneTitulo && (
-                          <h2 className="text-4xl md:text-5xl font-black tracking-tight wrap-break-word">
-                            {pagina.titulo}
-                          </h2>
+                    {(tieneTitulo || tieneSubtitulo) && (
+                      <div className="mb-12 border-b border-stone-200/50 pb-6 relative z-10">
+                        <div className="flex items-center gap-4">
+                          {mostrarNum && (
+                            <span className="text-5xl font-black opacity-30">{seccionActiva.numeroReal}.</span>
+                          )}
+                          {tieneTitulo && (
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight wrap-break-word">
+                              {pagina.titulo}
+                            </h2>
+                          )}
+                        </div>
+                        {tieneSubtitulo && (
+                          <p className="text-lg md:text-xl text-stone-500 font-serif italic mt-3 wrap-break-word">
+                            {pagina.subtitulo}
+                          </p>
                         )}
                       </div>
-                      {tieneSubtitulo && (
-                        <p className="text-lg md:text-xl text-stone-500 font-serif italic mt-3 wrap-break-word">
-                          {pagina.subtitulo}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    )}
 
-                  <div className="space-y-12 pb-28 relative z-10 flex-1 min-w-0">
-                    {pagina.bloques.map((bloque) => (
-                      <div key={bloque.id} className="w-full min-w-0">
-                        
-                        {bloque.tipo === 'texto' && (
-                          bloque.columnas === 2 || bloque.columnas === 3 ? (
-                            <div 
-                              className={`grid grid-cols-1 ${bloque.columnas === 2 ? 'md:grid-cols-2 gap-8 md:gap-12' : 'md:grid-cols-3 gap-6 md:gap-8'} p-4 sm:p-6 rounded-2xl transition-colors items-start w-full min-w-0`}
-                              style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
-                            >
+                    <div className="space-y-12 pb-28 relative z-10 flex-1 min-w-0">
+                      {pagina.bloques.map((bloque) => (
+                        <div key={bloque.id} className="w-full min-w-0">
+                          
+                          {bloque.tipo === 'texto' && (
+                            bloque.columnas === 2 || bloque.columnas === 3 ? (
                               <div 
-                                className="prose prose-stone max-w-full min-w-0 text-stone-700 leading-normal wrap-break-word"
-                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }}
-                              />
-                              <div 
-                                className="prose prose-stone max-w-full min-w-0 text-stone-700 leading-normal md:border-l md:border-stone-200/70 md:pl-8 wrap-break-word"
-                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenidoCol2 || '') }}
-                              />
-                              {bloque.columnas === 3 && (
+                                className={`grid grid-cols-1 ${bloque.columnas === 2 ? 'md:grid-cols-2 gap-8 md:gap-12' : 'md:grid-cols-3 gap-6 md:gap-8'} p-4 sm:p-6 rounded-2xl transition-colors items-start w-full min-w-0`}
+                                style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
+                              >
+                                <div 
+                                  className="prose prose-stone max-w-full min-w-0 text-stone-700 leading-normal wrap-break-word"
+                                  dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }}
+                                />
                                 <div 
                                   className="prose prose-stone max-w-full min-w-0 text-stone-700 leading-normal md:border-l md:border-stone-200/70 md:pl-8 wrap-break-word"
-                                  dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenidoCol3 || '') }}
+                                  dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenidoCol2 || '') }}
                                 />
-                              )}
-                            </div>
-                          ) : (
-                            <div 
-                              className="prose prose-lg prose-stone max-w-full min-w-0 text-stone-700 leading-relaxed p-4 sm:p-6 rounded-2xl transition-colors wrap-break-word"
-                              style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
-                              dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }}
-                            />
-                          )
-                        )}
-
-                        {bloque.tipo === 'firma' && (
-                          <div 
-                            className={`py-6 px-4 rounded-2xl flex flex-wrap gap-12 items-end ${
-                              bloque.alineacion === 'centro' ? 'justify-center text-center' :
-                              bloque.alineacion === 'derecha' ? 'justify-end text-right' :
-                              bloque.alineacion === 'espaciado' ? 'justify-around text-left' :
-                              'justify-start text-left'
-                            }`}
-                            style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
-                          >
-                            {(bloque.firmas || []).map((fItem, fIdx) => (
-                              <div key={fItem.id || fIdx} className="flex flex-col space-y-1 min-w-56">
-                                {fItem.url && (
-                                  <img
-                                    src={fItem.url}
-                                    alt={fItem.nombre}
-                                    style={{ height: `${fItem.tamanoFirma ?? 72}px` }}
-                                    className={`w-auto object-contain mb-2 ${
-                                      bloque.alineacion === 'centro' ? 'mx-auto' :
-                                      bloque.alineacion === 'derecha' ? 'ml-auto' : 'mr-auto'
-                                    }`}
+                                {bloque.columnas === 3 && (
+                                  <div 
+                                    className="prose prose-stone max-w-full min-w-0 text-stone-700 leading-normal md:border-l md:border-stone-200/70 md:pl-8 wrap-break-word"
+                                    dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenidoCol3 || '') }}
                                   />
                                 )}
-                                <span className="font-sans font-black text-stone-900 text-base leading-snug">{fItem.nombre}</span>
-                                {fItem.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{fItem.cargo}</span>}
-                                {fItem.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{fItem.infoAdicional}</span>}
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            ) : (
+                              <div 
+                                className="prose prose-lg prose-stone max-w-full min-w-0 text-stone-700 leading-relaxed p-4 sm:p-6 rounded-2xl transition-colors wrap-break-word"
+                                style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
+                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }}
+                              />
+                            )
+                          )}
 
-                        {bloque.tipo === 'boton' && (
-                          <div 
-                            className={`py-4 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}
-                            style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
-                          >
-                            <a
-                              href={bloque.url || '#'}
-                              target={bloque.url?.startsWith('#') ? undefined : (bloque.abrirNuevaPestana !== false ? "_blank" : "_self")}
-                              rel={bloque.url?.startsWith('#') ? undefined : "noreferrer"}
-                              onClick={(e) => {
-                                if (bloque.url?.startsWith('#')) {
-                                  e.preventDefault();
-                                  irAPaginaInterna(bloque.url);
-                                }
-                              }}
-                              style={{
-                                backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
-                                color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
-                                borderColor: bloque.colorBoton,
-                                boxShadow: bloque.estilo === '3d' 
-                                  ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
-                                  : bloque.estilo === '4d'
-                                  ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
-                                  : undefined
-                              }}
-                              className={`px-9 py-4 font-sans font-black text-sm uppercase tracking-wider transition-all duration-200 inline-block hover:scale-105 active:scale-95 ${
-                                bloque.estilo === 'pildora' ? 'rounded-full shadow-lg' :
-                                bloque.estilo === 'contorno' ? 'rounded-xl border-2 hover:bg-black/5' :
-                                bloque.estilo === '3d' ? 'rounded-xl -translate-y-1 active:translate-y-0.5' :
-                                bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
-                                'rounded-xl shadow-lg'
-                              }`}
-                            >
-                              {bloque.texto || 'Explorar'}
-                            </a>
-                          </div>
-                        )}
-
-                        {bloque.tipo === 'imagen' && bloque.url && (
-                          <div className={bloque.pantallaCompleta ? "w-screen relative left-1/2 -translate-x-1/2 my-12 shadow-sm" : "w-full rounded-3xl overflow-hidden shadow-sm border border-stone-200/50"} style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}>
-                            <img 
-                              src={bloque.url} 
-                              alt="Imagen de la publicación" 
-                              className={`w-full object-cover ${bloque.pantallaCompleta ? 'h-auto max-h-screen' : 'h-auto max-h-[75vh]'}`} 
-                            />
-                          </div>
-                        )}
-
-                        {bloque.tipo === 'tabla' && !bloque.oculto && (() => {
-                          const filtroActual = (filtrosTablas[bloque.id] || '').trim();
-                          const filtroNorm = quitarAcentos(filtroActual);
-                          const filasCuerpoOriginales = bloque.data.slice(1);
-                          const filasCuerpo = filtroNorm
-                            ? filasCuerpoOriginales.filter(f => f.some(celda => quitarAcentos(String(celda)).includes(filtroNorm)))
-                            : filasCuerpoOriginales;
-
-                          return (
+                          {/* RENDERIZADO DEL BLOQUE DE FIRMAS CON TAMAÑO EXACTO Y POSICIÓN VERTICAL CONFIGURABLES */}
+                          {bloque.tipo === 'firma' && (
                             <div 
-                              className="border border-stone-200/50 rounded-2xl overflow-hidden shadow-sm transition-all mx-auto" 
+                              className={`px-4 rounded-2xl flex flex-wrap gap-12 items-end ${
+                                bloque.alineacion === 'centro' ? 'justify-center text-center' :
+                                bloque.alineacion === 'derecha' ? 'justify-end text-right' :
+                                bloque.alineacion === 'espaciado' ? 'justify-around text-left' :
+                                'justify-start text-left'
+                              }`}
+                              style={{ 
+                                backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent'),
+                                paddingTop: `${Math.max(8, 24 + (bloque.espacioGeneralSuperior ?? 0))}px`,
+                                paddingBottom: `${Math.max(8, 24 + (bloque.espacioGeneralInferior ?? 0))}px`
+                              }}
+                            >
+                              {(bloque.firmas || []).map((fItem, fIdx) => (
+                                <div 
+                                  key={fItem.id || fIdx} 
+                                  className="flex flex-col space-y-1 min-w-56 transition-all"
+                                  style={{ marginTop: `${fItem.espacioSuperior ?? 0}px` }}
+                                >
+                                  {fItem.url && (
+                                    <div className={`mb-2 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                      <img
+                                        src={fItem.url}
+                                        alt={fItem.nombre}
+                                        style={{ 
+                                          height: `${fItem.tamanoFirma ?? 72}px`, 
+                                          maxHeight: `${fItem.tamanoFirma ?? 72}px`,
+                                          width: 'auto' 
+                                        }}
+                                        className="object-contain"
+                                      />
+                                    </div>
+                                  )}
+                                  <span className="font-sans font-black text-stone-900 text-base leading-snug">{fItem.nombre}</span>
+                                  {fItem.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{fItem.cargo}</span>}
+                                  {fItem.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{fItem.infoAdicional}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {bloque.tipo === 'boton' && (
+                            <div 
+                              className={`py-4 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}
+                              style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}
+                            >
+                              <a
+                                href={bloque.url || '#'}
+                                target={bloque.url?.startsWith('#') ? undefined : (bloque.abrirNuevaPestana !== false ? "_blank" : "_self")}
+                                rel={bloque.url?.startsWith('#') ? undefined : "noreferrer"}
+                                onClick={(e) => {
+                                  if (bloque.url?.startsWith('#')) {
+                                    e.preventDefault();
+                                    irAPaginaInterna(bloque.url);
+                                  }
+                                }}
+                                style={{
+                                  backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
+                                  color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
+                                  borderColor: bloque.colorBoton,
+                                  boxShadow: bloque.estilo === '3d' 
+                                    ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
+                                    : bloque.estilo === '4d'
+                                    ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
+                                    : undefined
+                                }}
+                                className={`px-9 py-4 font-sans font-black text-sm uppercase tracking-wider transition-all duration-200 inline-block hover:scale-105 active:scale-95 ${
+                                  bloque.estilo === 'pildora' ? 'rounded-full shadow-lg' :
+                                  bloque.estilo === 'contorno' ? 'rounded-xl border-2 hover:bg-black/5' :
+                                  bloque.estilo === '3d' ? 'rounded-xl -translate-y-1 active:translate-y-0.5' :
+                                  bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
+                                  'rounded-xl shadow-lg'
+                                }`}
+                              >
+                                {bloque.texto || 'Explorar'}
+                              </a>
+                            </div>
+                          )}
+
+                          {bloque.tipo === 'imagen' && bloque.url && (
+                            <div className={bloque.pantallaCompleta ? "w-screen relative left-1/2 -translate-x-1/2 my-12 shadow-sm" : "w-full rounded-3xl overflow-hidden shadow-sm border border-stone-200/50"} style={{ backgroundColor: bloque.colorFondo === 'transparent' ? 'transparent' : (bloque.colorFondo || 'transparent') }}>
+                              <img 
+                                src={bloque.url} 
+                                alt="Imagen de la publicación" 
+                                className={`w-full object-cover ${bloque.pantallaCompleta ? 'h-auto max-h-screen' : 'h-auto max-h-[75vh]'}`} 
+                              />
+                            </div>
+                          )}
+
+                          {bloque.tipo === 'tabla' && !bloque.oculto && (() => {
+                            const filtroActual = (filtrosTablas[bloque.id] || '').trim();
+                            const filtroNorm = quitarAcentos(filtroActual);
+                            const filasCuerpoOriginales = bloque.data.slice(1);
+                            const filasCuerpo = filtroNorm
+                              ? filasCuerpoOriginales.filter(f => f.some(celda => quitarAcentos(String(celda)).includes(filtroNorm)))
+                              : filasCuerpoOriginales;
+
+                            return (
+                              <div 
+                                className="border border-stone-200/50 rounded-2xl overflow-hidden shadow-sm transition-all mx-auto" 
+                                style={{ 
+                                  backgroundColor: bloque.colorFondo || '#ffffff',
+                                  width: `${Math.min(100, bloque.escala || 100)}%`,
+                                  zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
+                                }}
+                              >
+                                <div className="bg-stone-50/70 border-b border-stone-200/60 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
+                                  <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-stone-800">{bloque.nombre}</h3>
+                                  
+                                  <div className="flex flex-wrap items-center gap-2 font-sans">
+                                    {filasCuerpoOriginales.length > 6 && (
+                                      <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-lg px-2.5 py-1">
+                                        <Search size={12} className="text-stone-400" />
+                                        <input
+                                          type="text"
+                                          value={filtrosTablas[bloque.id] || ''}
+                                          onChange={(e) => setFiltrosTablas(prev => ({ ...prev, [bloque.id]: e.target.value }))}
+                                          placeholder="Filtrar fila..."
+                                          className="text-[11px] font-medium bg-transparent outline-none w-24 sm:w-32 text-stone-700"
+                                        />
+                                        {filtroActual && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setFiltrosTablas(prev => ({ ...prev, [bloque.id]: '' }))}
+                                            className="text-stone-400 hover:text-stone-700"
+                                          >
+                                            <X size={11} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => copiarTablaPortapapeles(bloque)}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-stone-100 border border-stone-200 text-[11px] font-bold text-stone-600 transition-colors cursor-pointer"
+                                      title="Copiar datos para pegar en Excel"
+                                    >
+                                      {tablaCopiadaId === bloque.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                      <span>{tablaCopiadaId === bloque.id ? 'Copiado' : 'Copiar'}</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => descargarTablaCsv(bloque)}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 text-[11px] font-bold text-stone-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                                      title="Descargar esta tabla en formato CSV / Excel"
+                                    >
+                                      <Download size={12} />
+                                      <span>Excel / CSV</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                  <table 
+                                    className="w-full text-left font-sans border-collapse" 
+                                    style={{ 
+                                      backgroundColor: bloque.colorFondo || '#ffffff',
+                                      fontSize: `${bloque.tamanoTextoTabla ?? 14}px`
+                                    }}
+                                  >
+                                    <thead className="border-b border-stone-200/50 sticky top-0 z-10" style={{ backgroundColor: bloque.coloresFilas?.[0] || bloque.colorFondo || '#f5f5f4' }}>
+                                      <tr>
+                                        {bloque.data[0]?.map((cabecera, i) => {
+                                          const padGeneral = bloque.paddingFila ?? 6;
+                                          const altoCabecera = bloque.altosFilas?.[0];
+                                          const fontSizeHeader = Math.max(9, (bloque.tamanoTextoTabla ?? 14) - 1);
+                                          const padY = altoCabecera !== undefined && altoCabecera > 0
+                                            ? Math.max(0, Math.round((altoCabecera - fontSizeHeader) / 2))
+                                            : padGeneral;
+                                          const anchoCol = bloque.anchosColumnas?.[i];
+                                          return (
+                                            <th 
+                                              key={i} 
+                                              className="font-bold px-4 uppercase tracking-wider align-middle"
+                                              style={{ 
+                                                backgroundColor: bloque.coloresFilas?.[0] || bloque.coloresColumnas?.[i] || 'transparent',
+                                                fontSize: `${fontSizeHeader}px`,
+                                                lineHeight: 1.1,
+                                                paddingTop: `${padY}px`,
+                                                paddingBottom: `${padY}px`,
+                                                ...(altoCabecera ? { height: `${altoCabecera}px` } : {}),
+                                                ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
+                                              }}
+                                            >
+                                              {cabecera}
+                                            </th>
+                                          );
+                                        })}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-stone-100/50">
+                                      {filasCuerpo.map((fila, fIdx) => {
+                                        const realRowIndex = fIdx + 1;
+                                        const colorFila = bloque.coloresFilas?.[realRowIndex];
+                                        const padGeneral = bloque.paddingFila ?? 6;
+                                        const altoFila = bloque.altosFilas?.[realRowIndex];
+                                        const fontSizeBody = bloque.tamanoTextoTabla ?? 14;
+                                        const padY = altoFila !== undefined && altoFila > 0
+                                          ? Math.max(0, Math.round((altoFila - fontSizeBody) / 2))
+                                          : padGeneral;
+
+                                        return (
+                                          <tr 
+                                            key={fIdx} 
+                                            className="hover:bg-black/5 transition-colors"
+                                            style={{ 
+                                              backgroundColor: colorFila || bloque.colorFondo || '#ffffff',
+                                              ...(altoFila ? { height: `${altoFila}px` } : {})
+                                            }}
+                                          >
+                                            {fila.map((celda, cIdx) => {
+                                              const colorCol = bloque.coloresColumnas?.[cIdx];
+                                              const anchoCol = bloque.anchosColumnas?.[cIdx];
+                                              return (
+                                                <td 
+                                                  key={cIdx} 
+                                                  className={`px-4 align-middle ${cIdx === 0 ? 'font-semibold' : 'opacity-85'}`}
+                                                  style={{ 
+                                                    backgroundColor: colorFila || colorCol || 'transparent',
+                                                    fontSize: `${fontSizeBody}px`,
+                                                    lineHeight: 1.1,
+                                                    paddingTop: `${padY}px`,
+                                                    paddingBottom: `${padY}px`,
+                                                    ...(altoFila ? { height: `${altoFila}px` } : {}),
+                                                    ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
+                                                  }}
+                                                >
+                                                  {celda}
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                {!textoVacioQuill(bloque.pieBloque) && (
+                                  <div 
+                                    className="px-6 py-3 bg-stone-50/40 border-t border-stone-200/50 prose prose-sm prose-stone max-w-none text-stone-600 leading-snug"
+                                    dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.pieBloque || '') }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {bloque.tipo === 'grafica' && (
+                            <div 
+                              className="border border-stone-200/50 rounded-2xl overflow-hidden shadow-sm p-8 transition-all mx-auto" 
                               style={{ 
                                 backgroundColor: bloque.colorFondo || '#ffffff',
                                 width: `${Math.min(100, bloque.escala || 100)}%`,
                                 zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
                               }}
                             >
-                              <div className="bg-stone-50/70 border-b border-stone-200/60 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
-                                <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-stone-800">{bloque.nombre}</h3>
-                                
-                                <div className="flex flex-wrap items-center gap-2 font-sans">
-                                  {filasCuerpoOriginales.length > 6 && (
-                                    <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-lg px-2.5 py-1">
-                                      <Search size={12} className="text-stone-400" />
-                                      <input
-                                        type="text"
-                                        value={filtrosTablas[bloque.id] || ''}
-                                        onChange={(e) => setFiltrosTablas(prev => ({ ...prev, [bloque.id]: e.target.value }))}
-                                        placeholder="Filtrar fila..."
-                                        className="text-[11px] font-medium bg-transparent outline-none w-24 sm:w-32 text-stone-700"
-                                      />
-                                      {filtroActual && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setFiltrosTablas(prev => ({ ...prev, [bloque.id]: '' }))}
-                                          className="text-stone-400 hover:text-stone-700"
-                                        >
-                                          <X size={11} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={() => copiarTablaPortapapeles(bloque)}
-                                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-stone-100 border border-stone-200 text-[11px] font-bold text-stone-600 transition-colors cursor-pointer"
-                                    title="Copiar datos para pegar en Excel"
-                                  >
-                                    {tablaCopiadaId === bloque.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                                    <span>{tablaCopiadaId === bloque.id ? 'Copiado' : 'Copiar'}</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => descargarTablaCsv(bloque)}
-                                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 text-[11px] font-bold text-stone-700 hover:text-emerald-800 transition-colors cursor-pointer"
-                                    title="Descargar esta tabla en formato CSV / Excel"
-                                  >
-                                    <Download size={12} />
-                                    <span>Excel / CSV</span>
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="overflow-x-auto">
-                                <table 
-                                  className="w-full text-left font-sans border-collapse" 
-                                  style={{ 
-                                    backgroundColor: bloque.colorFondo || '#ffffff',
-                                    fontSize: `${bloque.tamanoTextoTabla ?? 14}px`
-                                  }}
-                                >
-                                  <thead className="border-b border-stone-200/50 sticky top-0 z-10" style={{ backgroundColor: bloque.coloresFilas?.[0] || bloque.colorFondo || '#f5f5f4' }}>
-                                    <tr>
-                                      {bloque.data[0]?.map((cabecera, i) => {
-                                        const padGeneral = bloque.paddingFila ?? 6;
-                                        const altoCabecera = bloque.altosFilas?.[0];
-                                        const fontSizeHeader = Math.max(9, (bloque.tamanoTextoTabla ?? 14) - 1);
-                                        const padY = altoCabecera !== undefined && altoCabecera > 0
-                                          ? Math.max(0, Math.round((altoCabecera - fontSizeHeader) / 2))
-                                          : padGeneral;
-                                        const anchoCol = bloque.anchosColumnas?.[i];
-                                        return (
-                                          <th 
-                                            key={i} 
-                                            className="font-bold px-4 uppercase tracking-wider align-middle"
-                                            style={{ 
-                                              backgroundColor: bloque.coloresFilas?.[0] || bloque.coloresColumnas?.[i] || 'transparent',
-                                              fontSize: `${fontSizeHeader}px`,
-                                              lineHeight: 1.1,
-                                              paddingTop: `${padY}px`,
-                                              paddingBottom: `${padY}px`,
-                                              ...(altoCabecera ? { height: `${altoCabecera}px` } : {}),
-                                              ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
-                                            }}
-                                          >
-                                            {cabecera}
-                                          </th>
-                                        );
-                                      })}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-stone-100/50">
-                                    {filasCuerpo.map((fila, fIdx) => {
-                                      const realRowIndex = fIdx + 1;
-                                      const colorFila = bloque.coloresFilas?.[realRowIndex];
-                                      const padGeneral = bloque.paddingFila ?? 6;
-                                      const altoFila = bloque.altosFilas?.[realRowIndex];
-                                      const fontSizeBody = bloque.tamanoTextoTabla ?? 14;
-                                      const padY = altoFila !== undefined && altoFila > 0
-                                        ? Math.max(0, Math.round((altoFila - fontSizeBody) / 2))
-                                        : padGeneral;
-
-                                      return (
-                                        <tr 
-                                          key={fIdx} 
-                                          className="hover:bg-black/5 transition-colors"
-                                          style={{ 
-                                            backgroundColor: colorFila || bloque.colorFondo || '#ffffff',
-                                            ...(altoFila ? { height: `${altoFila}px` } : {})
-                                          }}
-                                        >
-                                          {fila.map((celda, cIdx) => {
-                                            const colorCol = bloque.coloresColumnas?.[cIdx];
-                                            const anchoCol = bloque.anchosColumnas?.[cIdx];
-                                            return (
-                                              <td 
-                                                key={cIdx} 
-                                                className={`px-4 align-middle ${cIdx === 0 ? 'font-semibold' : 'opacity-85'}`}
-                                                style={{ 
-                                                  backgroundColor: colorFila || colorCol || 'transparent',
-                                                  fontSize: `${fontSizeBody}px`,
-                                                  lineHeight: 1.1,
-                                                  paddingTop: `${padY}px`,
-                                                  paddingBottom: `${padY}px`,
-                                                  ...(altoFila ? { height: `${altoFila}px` } : {}),
-                                                  ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
-                                                }}
-                                              >
-                                                {celda}
-                                              </td>
-                                            );
-                                          })}
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
+                              <h3 className="font-sans font-bold uppercase tracking-widest text-sm text-center mb-8">{bloque.nombre}</h3>
+                              {renderizarGrafica(bloque)}
                               {!textoVacioQuill(bloque.pieBloque) && (
                                 <div 
-                                  className="px-6 py-3 bg-stone-50/40 border-t border-stone-200/50 prose prose-sm prose-stone max-w-none text-stone-600 leading-snug"
+                                  className="mt-4 pt-3 border-t border-stone-200/50 prose prose-sm prose-stone max-w-none text-stone-600 leading-snug"
                                   dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.pieBloque || '') }}
                                 />
                               )}
                             </div>
-                          );
-                        })()}
+                          )}
 
-                        {bloque.tipo === 'grafica' && (
-                          <div 
-                            className="border border-stone-200/50 rounded-2xl overflow-hidden shadow-sm p-8 transition-all mx-auto" 
-                            style={{ 
-                              backgroundColor: bloque.colorFondo || '#ffffff',
-                              width: `${Math.min(100, bloque.escala || 100)}%`,
-                              zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
-                            }}
-                          >
-                            <h3 className="font-sans font-bold uppercase tracking-widest text-sm text-center mb-8">{bloque.nombre}</h3>
-                            {renderizarGrafica(bloque)}
-                            {!textoVacioQuill(bloque.pieBloque) && (
-                              <div 
-                                className="mt-4 pt-3 border-t border-stone-200/50 prose prose-sm prose-stone max-w-none text-stone-600 leading-snug"
-                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.pieBloque || '') }}
-                              />
-                            )}
-                          </div>
-                        )}
+                        </div>
+                      ))}
+                    </div>
 
-                      </div>
-                    ))}
+                    {pieMostrar && (
+                      <div 
+                        className="mt-12 pt-6 pb-24 border-t border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-75"
+                        dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrar) }}
+                      />
+                    )}
+
                   </div>
-
-                  {pieMostrar && (
-                    <div 
-                      className="mt-12 pt-6 pb-24 border-t border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-75"
-                      dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrar) }}
-                    />
-                  )}
-
                 </div>
-              </div>
-            );
-          })()}
-        </motion.div>
-      </AnimatePresence>
+              );
+            })()}
+          </motion.div>
+        </AnimatePresence>
+      )}
       
       {/* FLECHAS LATERALES DE NAVEGACIÓN RÁPIDA */}
-      <AnimatePresence>
-        {paginaActual > 0 && (
-          <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            onClick={() => navegarASeccion(paginaActual - 1)}
-            className="absolute left-6 md:left-12 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-full hidden md:flex items-center justify-center text-stone-500 hover:text-blue-700 hover:border-blue-700 hover:bg-white shadow-lg shadow-stone-200/50 transition-all z-40 group cursor-pointer no-print"
-          >
-            <ChevronLeft size={32} strokeWidth={1.5} className="group-hover:-translate-x-1 transition-transform" />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {!generandoPdfPublico && (
+        <AnimatePresence>
+          {paginaActual > 0 && (
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              onClick={() => navegarASeccion(paginaActual - 1)}
+              className="absolute left-6 md:left-12 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-full hidden md:flex items-center justify-center text-stone-500 hover:text-blue-700 hover:border-blue-700 hover:bg-white shadow-lg shadow-stone-200/50 transition-all z-40 group cursor-pointer no-print"
+            >
+              <ChevronLeft size={32} strokeWidth={1.5} className="group-hover:-translate-x-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      )}
 
-      <AnimatePresence>
-        {paginaActual < totalSecciones - 1 && (
-          <motion.button
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            onClick={() => navegarASeccion(paginaActual + 1)}
-            className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-full hidden md:flex items-center justify-center text-stone-500 hover:text-blue-700 hover:border-blue-700 hover:bg-white shadow-lg shadow-stone-200/50 transition-all z-40 group cursor-pointer no-print"
-          >
-            <ChevronRight size={32} strokeWidth={1.5} className="group-hover:translate-x-1 transition-transform" />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {!generandoPdfPublico && (
+        <AnimatePresence>
+          {paginaActual < totalSecciones - 1 && (
+            <motion.button
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              onClick={() => navegarASeccion(paginaActual + 1)}
+              className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 bg-white/80 backdrop-blur-xl border border-stone-200 rounded-full hidden md:flex items-center justify-center text-stone-500 hover:text-blue-700 hover:border-blue-700 hover:bg-white shadow-lg shadow-stone-200/50 transition-all z-40 group cursor-pointer no-print"
+            >
+              <ChevronRight size={32} strokeWidth={1.5} className="group-hover:translate-x-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      )}
 
       {/* DOCK FLOTANTE COMPACTO DE NAVEGACIÓN */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl pointer-events-auto no-print">
-        <div className="bg-white/95 backdrop-blur-xl border border-stone-200/90 shadow-xl shadow-stone-900/10 rounded-2xl px-4 py-2.5 flex flex-col gap-2 font-sans">
-          
-          <div className="flex items-center justify-between gap-2">
+      {!generandoPdfPublico && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl pointer-events-auto no-print">
+          <div className="bg-white/95 backdrop-blur-xl border border-stone-200/90 shadow-xl shadow-stone-900/10 rounded-2xl px-4 py-2.5 flex flex-col gap-2 font-sans">
             
-            <div className="flex items-center gap-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => navegarASeccion(paginaActual - 1)}
-                disabled={paginaActual === 0}
-                className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition-colors cursor-pointer shrink-0"
-                title="Página anterior"
-              >
-                <ChevronLeft size={18} />
-              </button>
-
-              <div className="relative flex items-center min-w-0">
-                <ListOrdered size={14} className="text-stone-400 mr-1.5 hidden sm:inline shrink-0" />
-                <select
-                  value={paginaActual}
-                  onChange={(e) => navegarASeccion(Number(e.target.value))}
-                  className="bg-transparent text-xs font-bold text-stone-800 outline-none cursor-pointer max-w-40 sm:max-w-60 truncate py-1 pr-2 hover:text-blue-700 transition-colors"
-                  title="Saltar directamente a cualquier sección o página"
+            <div className="flex items-center justify-between gap-2">
+              
+              <div className="flex items-center gap-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => navegarASeccion(paginaActual - 1)}
+                  disabled={paginaActual === 0}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition-colors cursor-pointer shrink-0"
+                  title="Página anterior"
                 >
-                  {secciones.map((sec, idx) => {
-                    const itemIdx = indiceBusqueda[idx];
-                    return (
-                      <option key={idx} value={idx}>
-                        {sec.tipo === 'portada'
-                          ? 'Portada Principal'
-                          : `Pág. ${sec.numeroReal} — ${itemIdx?.titulo || `Hoja ${sec.numeroReal}`}`}
-                      </option>
-                    );
-                  })}
-                </select>
+                  <ChevronLeft size={18} />
+                </button>
+
+                <div className="relative flex items-center min-w-0">
+                  <ListOrdered size={14} className="text-stone-400 mr-1.5 hidden sm:inline shrink-0" />
+                  <select
+                    value={paginaActual}
+                    onChange={(e) => navegarASeccion(Number(e.target.value))}
+                    className="bg-transparent text-xs font-bold text-stone-800 outline-none cursor-pointer max-w-40 sm:max-w-60 truncate py-1 pr-2 hover:text-blue-700 transition-colors"
+                    title="Saltar directamente a cualquier sección o página"
+                  >
+                    {secciones.map((sec, idx) => {
+                      const itemIdx = indiceBusqueda[idx];
+                      return (
+                        <option key={idx} value={idx}>
+                          {sec.tipo === 'portada'
+                            ? 'Portada Principal'
+                            : `Pág. ${sec.numeroReal} — ${itemIdx?.titulo || `Hoja ${sec.numeroReal}`}`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navegarASeccion(paginaActual + 1)}
+                  disabled={paginaActual === totalSecciones - 1}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition-colors cursor-pointer shrink-0"
+                  title="Página siguiente"
+                >
+                  <ChevronRight size={18} />
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navegarASeccion(paginaActual + 1)}
-                disabled={paginaActual === totalSecciones - 1}
-                className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-600 disabled:opacity-30 transition-colors cursor-pointer shrink-0"
-                title="Página siguiente"
-              >
-                <ChevronRight size={18} />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const num = Number(inputIrAPagina);
+                    if (!isNaN(num) && num >= 1 && num <= paginas.length) {
+                      irAPaginaInterna(String(num));
+                      setInputIrAPagina('');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 bg-stone-100/90 border border-stone-200/90 rounded-xl px-3 py-1"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 hidden sm:inline">Ir a pág:</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={inputIrAPagina}
+                    onChange={(e) => setInputIrAPagina(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder={seccionActiva.tipo === 'portada' ? '0' : `${seccionActiva.numeroReal}`}
+                    className="w-9 text-center text-xs font-black text-stone-900 bg-white border border-stone-200/80 rounded-md py-0.5 outline-none focus:border-blue-500 transition-colors"
+                    title="Escribe un número de página y presiona Enter"
+                  />
+                  <span className="text-xs font-black text-stone-400 whitespace-nowrap">
+                    / {paginas.length}
+                  </span>
+                  {inputIrAPagina && (
+                    <button
+                      type="submit"
+                      className="text-blue-600 hover:text-blue-800 p-0.5 cursor-pointer"
+                      title="Saltar a la página"
+                    >
+                      <ArrowRight size={13} />
+                    </button>
+                  )}
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => setBuscadorAbierto(true)}
+                  className="p-2 rounded-xl bg-stone-900 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
+                  title="Buscar en todo el libro (Ctrl + K)"
+                >
+                  <Search size={14} />
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const num = Number(inputIrAPagina);
-                  if (!isNaN(num) && num >= 1 && num <= paginas.length) {
-                    irAPaginaInterna(String(num));
-                    setInputIrAPagina('');
-                  }
-                }}
-                className="flex items-center gap-1.5 bg-stone-100/90 border border-stone-200/90 rounded-xl px-3 py-1"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 hidden sm:inline">Ir a pág:</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={inputIrAPagina}
-                  onChange={(e) => setInputIrAPagina(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder={seccionActiva.tipo === 'portada' ? '0' : `${seccionActiva.numeroReal}`}
-                  className="w-9 text-center text-xs font-black text-stone-900 bg-white border border-stone-200/80 rounded-md py-0.5 outline-none focus:border-blue-500 transition-colors"
-                  title="Escribe un número de página y presiona Enter"
-                />
-                <span className="text-xs font-black text-stone-400 whitespace-nowrap">
-                  / {paginas.length}
-                </span>
-                {inputIrAPagina && (
-                  <button
-                    type="submit"
-                    className="text-blue-600 hover:text-blue-800 p-0.5 cursor-pointer"
-                    title="Saltar a la página"
-                  >
-                    <ArrowRight size={13} />
-                  </button>
-                )}
-              </form>
-
-              <button
-                type="button"
-                onClick={() => setBuscadorAbierto(true)}
-                className="p-2 rounded-xl bg-stone-900 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
-                title="Buscar en todo el libro (Ctrl + K)"
-              >
-                <Search size={14} />
-              </button>
+            <div className="flex items-center gap-3 px-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 shrink-0 min-w-12">
+                {seccionActiva.tipo === 'portada' ? 'Portada' : `Pág ${seccionActiva.numeroReal}`}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, totalSecciones - 1)}
+                value={paginaActual}
+                onChange={(e) => navegarASeccion(Number(e.target.value))}
+                style={{ accentColor: edicionActiva?.color_principal || '#1d4ed8' }}
+                className="w-full h-1.5 bg-stone-200 rounded-lg cursor-pointer"
+                title="Arrastra para desplazarte rápidamente a cualquier punto del libro"
+              />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 shrink-0">
+                {paginas.length} págs
+              </span>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3 px-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 shrink-0 min-w-12">
-              {seccionActiva.tipo === 'portada' ? 'Portada' : `Pág ${seccionActiva.numeroReal}`}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0, totalSecciones - 1)}
-              value={paginaActual}
-              onChange={(e) => navegarASeccion(Number(e.target.value))}
-              style={{ accentColor: edicionActiva?.color_principal || '#1d4ed8' }}
-              className="w-full h-1.5 bg-stone-200 rounded-lg cursor-pointer"
-              title="Arrastra para desplazarte rápidamente a cualquier punto del libro"
-            />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 shrink-0">
-              {paginas.length} págs
-            </span>
           </div>
-
         </div>
-      </div>
+      )}
 
       {/* MODAL DEL BUSCADOR DINÁMICO INTELIGENTE */}
       <AnimatePresence>
-        {buscadorAbierto && (
+        {buscadorAbierto && !generandoPdfPublico && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

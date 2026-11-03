@@ -9,7 +9,8 @@ import {
   Plus, Minus, ChevronLeft, ChevronRight, GripVertical, Table as TableIcon, 
   X, BarChart3, Map as MapIcon, Image as ImageIcon, Palette,
   ArrowUp, ArrowDown, MoveLeft, MoveRight, Upload, Lock, ImagePlus, MousePointerClick,
-  PanelLeftClose, PanelLeftOpen, Link2, PenTool, Columns, Search, Download, Printer, FileJson
+  PanelLeftClose, PanelLeftOpen, Link2, PenTool, Columns, Search, Download, Printer, FileJson,
+  AlignLeft, AlignCenter, AlignRight, Square
 } from 'lucide-react';
 
 import { 
@@ -59,7 +60,7 @@ const NOMBRES_FUENTES_WORD: Record<string, { label: string; family: string }> = 
   'comic-sans-ms': { label: 'Comic Sans MS', family: '"Comic Sans MS", cursive, sans-serif' },
   'consolas': { label: 'Consolas', family: 'Consolas, monaco, monospace' },
   'constantia': { label: 'Constantia', family: 'Constantia, "Lucida Bright", Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif' },
-  'corbel': { label: 'Corbel', family: 'Corbel, "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "DejaVu Sans", "Bitstream Vera Sans", "Liberation Sans", Verdana, "Verdana Ref", sans-serif' },
+  'corbel': { label: 'Corbel', family: 'Corbel, "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "DejaVu Sans", "Liberation Sans", Verdana, "Verdana Ref", sans-serif' },
   'courier-new': { label: 'Courier New', family: '"Courier New", Courier, monospace' },
   'franklin-gothic-medium': { label: 'Franklin Gothic', family: '"Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", Arial, sans-serif' },
   'garamond': { label: 'Garamond', family: 'Garamond, Baskerville, "Baskerville Old Face", "Hoefler Text", "Times New Roman", serif' },
@@ -100,12 +101,27 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
   .ql-editor img {
     max-width: 100%;
     height: auto;
-    border-radius: 12px;
     cursor: pointer;
     transition: box-shadow 0.2s ease;
   }
   .ql-editor img:hover {
     box-shadow: 0 0 0 3px #3b82f6;
+  }
+  .ql-editor .ql-align-center {
+    text-align: center;
+  }
+  .ql-editor .ql-align-center img {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+  }
+  .ql-editor .ql-align-right {
+    text-align: right;
+  }
+  .ql-editor .ql-align-right img {
+    margin-left: auto;
+    margin-right: 0;
+    display: block;
   }
   .ql-snow .ql-editor a {
     color: inherit;
@@ -116,12 +132,39 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
     min-height: 1.5em;
     line-height: 1.5 !important;
   }
+  /* Clases dedicadas para imágenes personalizadas dentro del texto */
+  img[data-borde="cuadrado"], .ql-editor img[data-borde="cuadrado"] {
+    border-radius: 0px !important;
+  }
+  img[data-borde="redondeado"], .ql-editor img[data-borde="redondeado"] {
+    border-radius: 14px !important;
+  }
+  img[data-borde="circular"], .ql-editor img[data-borde="circular"] {
+    border-radius: 9999px !important;
+  }
+  img[data-alineacion="izquierda"], .ql-editor img[data-alineacion="izquierda"] {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+  img[data-alineacion="centro"], .ql-editor img[data-alineacion="centro"] {
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  img[data-alineacion="derecha"], .ql-editor img[data-alineacion="derecha"] {
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
   @media print {
     @page {
-      size: A4 portrait;
-      margin: 12mm;
+      size: A4 landscape;
+      margin: 10mm;
     }
-    body {
+    html, body {
+      height: auto !important;
+      overflow: visible !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       background: #fdfbf7 !important;
@@ -129,21 +172,30 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
     .no-print {
       display: none !important;
     }
+    .print-book-wrapper {
+      display: block !important;
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
     .print-page-sheet {
-      page-break-after: always;
-      break-after: page;
-      min-height: 265mm;
-      padding: 10mm 8mm;
-      box-sizing: border-box;
-      position: relative;
+      page-break-after: always !important;
+      break-after: page !important;
+      min-height: 185mm !important;
+      width: 100% !important;
+      padding: 12mm 14mm !important;
+      box-sizing: border-box !important;
+      position: relative !important;
+      overflow: visible !important;
     }
     .print-page-sheet:last-child {
-      page-break-after: auto;
-      break-after: auto;
+      page-break-after: auto !important;
+      break-after: auto !important;
     }
     .print-avoid-break {
-      page-break-inside: avoid;
-      break-inside: avoid;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
   }
 `;
@@ -157,6 +209,33 @@ const ReactQuill = dynamic(
       if (Font) {
         Font.whitelist = FUENTES_WORD;
         Quill.register(Font, true);
+      }
+      // Permitir atributos personalizados en imágenes dentro de Quill (width, style, data-borde, data-alineacion)
+      const BaseImage = Quill.import('formats/image') as any;
+      if (BaseImage) {
+        const ATTRIBUTES = ['alt', 'height', 'width', 'style', 'data-borde', 'data-alineacion'];
+        class CustomImage extends BaseImage {
+          static formats(domNode: HTMLElement) {
+            return ATTRIBUTES.reduce((formats: Record<string, string | null>, attribute) => {
+              if (domNode.hasAttribute(attribute)) {
+                formats[attribute] = domNode.getAttribute(attribute);
+              }
+              return formats;
+            }, {});
+          }
+          format(name: string, value: any) {
+            if (ATTRIBUTES.indexOf(name) > -1) {
+              if (value) {
+                this.domNode.setAttribute(name, value);
+              } else {
+                this.domNode.removeAttribute(name);
+              }
+            } else {
+              super.format(name, value);
+            }
+          }
+        }
+        Quill.register(CustomImage, true);
       }
     }
     return mod;
@@ -186,11 +265,14 @@ type ItemFirma = {
   cargo: string;
   infoAdicional?: string;
   tamanoFirma?: number;
+  espacioSuperior?: number;
 };
 
 type BloqueFirma = BloqueBase & {
   tipo: 'firma';
   alineacion: 'izquierda' | 'centro' | 'derecha' | 'espaciado';
+  espacioGeneralSuperior?: number;
+  espacioGeneralInferior?: number;
   firmas: ItemFirma[];
 };
 
@@ -307,7 +389,6 @@ export default function AdminPage() {
   const [edicionActiva, setEdicionActiva] = useState<Edicion | null>(null);
   const [pestañaActiva, setPestañaActiva] = useState<'diseno' | 'contenido'>('contenido');
 
-  // Estado para mostrar u ocultar el menú lateral de biblioteca
   const [menuLateralAbierto, setMenuLateralAbierto] = useState(true);
 
   const [paginas, setPaginas] = useState<Pagina[]>([]);
@@ -335,34 +416,35 @@ export default function AdminPage() {
 
   const [subiendoImagen, setSubiendoImagen] = useState<Record<string, boolean>>({});
   
-  // Tooltip flotante dinámico sobre el departamento en el mapa
   const [tooltipMapa, setTooltipMapa] = useState<{ nombre: string; valor: string; x: number; y: number } | null>(null);
 
-  // Estado para edición interactiva de color haciendo clic directo sobre la gráfica en vista previa
   const [selectorColorActivo, setSelectorColorActivo] = useState<{
     bloqueId: string;
     indice: number;
     etiqueta: string;
   } | null>(null);
 
-  // Estado para capturar el texto sombreado/seleccionado dentro de un bloque de texto y enlazarlo sin volver a escribirlo
+  // Estado para capturar tanto el texto sombreado como la posición exacta del cursor dentro de un bloque de texto
   const [seleccionTextoActiva, setSeleccionTextoActiva] = useState<{
     bloqueId: string;
     columna: 1 | 2 | 3;
     texto: string;
   } | null>(null);
   const rangoSeleccionRef = useRef<Range | null>(null);
+  const ultimoRangoCursorRef = useRef<{
+    bloqueId: string;
+    columna: 1 | 2 | 3;
+    range: Range;
+    contenedor: HTMLElement;
+  } | null>(null);
   const editorContenedorRef = useRef<HTMLElement | null>(null);
 
-  // Estado para el modal de Insertar / Clonar Tabla
   const [modalNuevaTablaAbierto, setModalNuevaTablaAbierto] = useState(false);
 
-  // Estados para el Inyector de Lotes JSON
   const [modalImportarJsonAbierto, setModalImportarJsonAbierto] = useState(false);
   const [jsonLoteInput, setJsonLoteInput] = useState('');
   const [modoInsercionJson, setModoInsercionJson] = useState<'final' | 'despues_actual' | 'reemplazar'>('final');
 
-  // Estado para generar y exportar todo el libro en PDF desde el Admin
   const [generandoPdfAdmin, setGenerandoPdfAdmin] = useState(false);
 
   const [modalConfirmacion, setModalConfirmacion] = useState<{
@@ -373,23 +455,10 @@ export default function AdminPage() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // PALETA POR DEFECTO EN TONOS PASTEL SUAVES Y ELEGANTES
   const COLORES_GRAFICAS_DEFAULT = [
-    '#93c5fd', // Azul pastel
-    '#86efac', // Verde menta pastel
-    '#fda4af', // Rosa coral pastel
-    '#d8b4fe', // Lavanda pastel
-    '#fdba74', // Durazno pastel
-    '#5eead4', // Turquesa pastel
-    '#f9a8d4', // Rosa suave
-    '#fde047', // Amarillo mantequilla pastel
-    '#a5b4fc', // Índigo pastel
-    '#cbd5e1', // Gris perla
-    '#bef264', // Lima pastel
-    '#67e8f9', // Cian pastel
-    '#fca5a5', // Salmón claro
-    '#c4b5fd', // Violeta pastel
-    '#fed7aa'  // Crema melocotón
+    '#93c5fd', '#86efac', '#fda4af', '#d8b4fe', '#fdba74',
+    '#5eead4', '#f9a8d4', '#fde047', '#a5b4fc', '#cbd5e1',
+    '#bef264', '#67e8f9', '#fca5a5', '#c4b5fd', '#fed7aa'
   ];
 
   const quillModules = useMemo(() => ({
@@ -554,16 +623,17 @@ export default function AdminPage() {
       setEstadoGuardadoVivo('guardando');
       try {
         const jsonToSave = JSON.stringify({ paginas: nuevasPaginas, configuracion: nuevaConfig });
-        await supabase.from('ediciones').update({ contenido_presentacion: jsonToSave }).eq('id', edicionActiva.id);
+        const { error } = await supabase.from('ediciones').update({ contenido_presentacion: jsonToSave }).eq('id', edicionActiva.id);
+        if (error) throw error;
         setEdicionActiva({ ...edicionActiva, contenido_presentacion: jsonToSave });
         setEstadoGuardadoVivo('guardado');
-      } catch (err) {
+      } catch (err: any) {
         setEstadoGuardadoVivo('escribiendo');
+        mostrarMensaje(`Aviso al guardar en nube: ${err?.message || 'Revisa permisos RLS'}`, 'error');
       }
     }, 1500);
   };
 
-  // FUNCIÓN PARA EXPORTAR Y DESCARGAR COPIA DE SEGURIDAD COMPLETA EN JSON
   const descargarRespaldoJson = () => {
     if (!edicionActiva) return;
     try {
@@ -592,15 +662,14 @@ export default function AdminPage() {
     }
   };
 
-  // FUNCIÓN PARA GENERAR Y DESCARGAR EL LIBRO COMPLETO EN PDF DESDE EL ADMIN
   const descargarLibroPdfAdmin = () => {
     setGenerandoPdfAdmin(true);
     setTimeout(() => {
       window.print();
       setTimeout(() => {
         setGenerandoPdfAdmin(false);
-      }, 600);
-    }, 1100);
+      }, 800);
+    }, 1400);
   };
   // FUNCIÓN DEL INYECTOR DE LOTES JSON INTELIGENTE
   const procesarInyeccionLoteJson = () => {
@@ -632,11 +701,9 @@ export default function AdminPage() {
         throw new Error('El lote JSON no contiene páginas válidas.');
       }
 
-      // Mapa para re-asignar IDs únicos a tablas y páginas para mantener conectados los enlaces internos y las gráficas
       const mapaIdsTablas: Record<string, string> = {};
       const mapaIdsPaginas: Record<string, string> = {};
 
-      // Primera pasada: generar nuevos IDs para páginas y tablas
       const paginasNormalizadas: Pagina[] = listaPaginasCrudas.map((pag: any, idx: number) => {
         const nuevaPagId = generarId();
         if (pag.id) {
@@ -675,7 +742,6 @@ export default function AdminPage() {
         return res;
       };
 
-      // Segunda pasada: sanitizar bloques y reconectar tablaRef de las gráficas y links internos
       const paginasListas: Pagina[] = paginasNormalizadas.map((pag) => {
         const bloquesSanitizados: Bloque[] = pag.bloques.map((b: any) => {
           if (b.tipo === 'texto') {
@@ -698,7 +764,8 @@ export default function AdminPage() {
                   nombre: String(f.nombre || ''),
                   cargo: String(f.cargo || ''),
                   infoAdicional: String(f.infoAdicional || ''),
-                  tamanoFirma: Number(f.tamanoFirma) || 72
+                  tamanoFirma: Number(f.tamanoFirma) || 72,
+                  espacioSuperior: Number(f.espacioSuperior) || 0
                 }))
               : [{
                   id: generarId(),
@@ -706,12 +773,15 @@ export default function AdminPage() {
                   nombre: String(b.nombre || 'Nombre y Apellido'),
                   cargo: String(b.cargo || 'Cargo Institucional'),
                   infoAdicional: String(b.infoAdicional || ''),
-                  tamanoFirma: Number(b.tamanoFirma) || 72
+                  tamanoFirma: Number(b.tamanoFirma) || 72,
+                  espacioSuperior: Number(b.espacioSuperior) || 0
                 }];
             return {
               id: b.id,
               tipo: 'firma',
               alineacion: b.alineacion || 'espaciado',
+              espacioGeneralSuperior: Number(b.espacioGeneralSuperior) || 0,
+              espacioGeneralInferior: Number(b.espacioGeneralInferior) || 0,
               firmas: listaFirmas,
               colorFondo: b.colorFondo || 'transparent'
             };
@@ -925,13 +995,25 @@ export default function AdminPage() {
     }
   };
 
-  // Subida e inyección directa de imagen redimensionable dentro de un bloque de texto
+  // Eliminar únicamente la imagen de una firma conservando sus textos (Nombre, Cargo, Info adicional)
+  const quitarSoloImagenFirma = (bloqueId: string, firmaIdx: number) => {
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueFirma;
+    if (bloque && bloque.tipo === 'firma' && bloque.firmas[firmaIdx]) {
+      bloque.firmas[firmaIdx].url = '';
+      autoGuardar(nuevasPaginas);
+      mostrarMensaje('Imagen de firma eliminada (se conservaron los datos del firmante).', 'exito');
+    }
+  };
+
+  // Subida e inyección directa de imagen dentro de un bloque de texto (en la posición del cursor o al final)
   const manejarSubidaImagenEnTexto = async (
     e: React.ChangeEvent<HTMLInputElement>,
     bloqueId: string,
     columnaDestino: 1 | 2 | 3,
     anchoValor: string,
-    alineacionImg: string
+    alineacionImg: string,
+    bordeImg: 'cuadrado' | 'redondeado' | 'circular' = 'cuadrado'
   ) => {
     const file = e.target.files?.[0];
     if (!file || !edicionActiva) return;
@@ -949,13 +1031,23 @@ export default function AdminPage() {
 
       const { data } = supabase.storage.from('imagenes').getPublicUrl(filePath);
 
-      insertarHtmlImagenEnTexto(bloqueId, data.publicUrl, columnaDestino, anchoValor, alineacionImg);
-      mostrarMensaje('Imagen insertada en el texto', 'exito');
+      insertarHtmlImagenEnTexto(bloqueId, data.publicUrl, columnaDestino, anchoValor, alineacionImg, bordeImg);
+      mostrarMensaje('Imagen insertada en la posición del cursor', 'exito');
     } catch (err: any) {
       mostrarMensaje(`Error al subir imagen: ${err.message}`, 'error');
     } finally {
       setSubiendoImagen(prev => ({ ...prev, [keyLoader]: false }));
+      e.target.value = '';
     }
+  };
+
+  const construirEstiloImagenTexto = (anchoValor: string, alineacionImg: string, bordeImg: string) => {
+    const anchoLimpio = anchoValor.trim() || '50%';
+    const radiusVal = bordeImg === 'circular' ? '9999px' : bordeImg === 'redondeado' ? '14px' : '0px';
+    let marginStyle = 'margin: 12px auto; display: block;';
+    if (alineacionImg === 'izquierda') marginStyle = 'margin: 12px auto 12px 0; display: block;';
+    if (alineacionImg === 'derecha') marginStyle = 'margin: 12px 0 12px auto; display: block;';
+    return `width: ${anchoLimpio}; max-width: 100%; height: auto; border-radius: ${radiusVal}; ${marginStyle}`;
   };
 
   const insertarHtmlImagenEnTexto = (
@@ -963,7 +1055,8 @@ export default function AdminPage() {
     urlImg: string,
     columnaDestino: 1 | 2 | 3,
     anchoValor: string,
-    alineacionImg: string
+    alineacionImg: string,
+    bordeImg: 'cuadrado' | 'redondeado' | 'circular' = 'cuadrado'
   ) => {
     if (!urlImg.trim()) return;
     const nuevasPaginas = [...paginas];
@@ -971,11 +1064,38 @@ export default function AdminPage() {
     if (!bloque || bloque.tipo !== 'texto') return;
 
     const anchoLimpio = anchoValor.trim() || '50%';
-    let styleWrapper = 'text-align: center; margin: 12px 0;';
-    if (alineacionImg === 'izquierda') styleWrapper = 'text-align: left; margin: 12px 0;';
-    if (alineacionImg === 'derecha') styleWrapper = 'text-align: right; margin: 12px 0;';
+    const claseAlignQuill = alineacionImg === 'centro' ? ' class="ql-align-center"' : alineacionImg === 'derecha' ? ' class="ql-align-right"' : '';
+    const imgStyle = construirEstiloImagenTexto(anchoLimpio, alineacionImg, bordeImg);
+    const htmlImg = `<p${claseAlignQuill}><img src="${urlImg}" alt="Imagen" width="${anchoLimpio}" data-borde="${bordeImg}" data-alineacion="${alineacionImg}" style="${imgStyle}" /></p>`;
 
-    const htmlImg = `<p style="${styleWrapper}"><img src="${urlImg}" alt="Imagen" style="width: ${anchoLimpio}; max-width: 100%; height: auto; display: inline-block; border-radius: 12px;" /></p>`;
+    // Si el usuario dejó el cursor en un punto específico del editor de este bloque, insertamos exactamente ahí
+    if (
+      ultimoRangoCursorRef.current &&
+      ultimoRangoCursorRef.current.bloqueId === bloqueId &&
+      ultimoRangoCursorRef.current.columna === columnaDestino &&
+      ultimoRangoCursorRef.current.contenedor
+    ) {
+      try {
+        const { range, contenedor } = ultimoRangoCursorRef.current;
+        if (contenedor.contains(range.commonAncestorContainer)) {
+          const imgElem = document.createElement('img');
+          imgElem.setAttribute('src', urlImg);
+          imgElem.setAttribute('alt', 'Imagen');
+          imgElem.setAttribute('width', anchoLimpio);
+          imgElem.setAttribute('data-borde', bordeImg);
+          imgElem.setAttribute('data-alineacion', alineacionImg);
+          imgElem.setAttribute('style', imgStyle);
+
+          range.insertNode(imgElem);
+          const campoCursor = columnaDestino === 2 ? 'contenidoCol2' : columnaDestino === 3 ? 'contenidoCol3' : 'contenido';
+          (bloque as any)[campoCursor] = contenedor.innerHTML;
+          autoGuardar(nuevasPaginas);
+          return;
+        }
+      } catch (e) {
+        // Fallback al método HTML si el rango expiró
+      }
+    }
 
     if (columnaDestino === 2) {
       bloque.contenidoCol2 = `${bloque.contenidoCol2 || ''}${htmlImg}`;
@@ -987,27 +1107,147 @@ export default function AdminPage() {
     autoGuardar(nuevasPaginas);
   };
 
-  // Ajustar el tamaño de todas las imágenes existentes dentro de una columna de texto
-  const redimensionarImagenesEnTexto = (bloqueId: string, columnaDestino: 1 | 2 | 3, nuevoAncho: string) => {
+  // EXTRAER LISTA DE IMÁGENES ACTUALES DENTRO DE UN BLOQUE DE TEXTO PARA PODER EDITARLAS, MOVERLAS O BORRARLAS INDIVIDUALMENTE
+  const extraerImagenesDeColumnaTexto = (htmlColumna?: string) => {
+    if (!htmlColumna || !htmlColumna.includes('<img')) return [];
+    const regexImg = /<img\b[^>]*>/gi;
+    const matches = htmlColumna.match(regexImg) || [];
+    return matches.map((imgTag, idx) => {
+      const srcMatch = imgTag.match(/src="([^"]*)"/i);
+      const widthMatch = imgTag.match(/width="([^"]*)"/i) || imgTag.match(/width:\s*([^;"]+)/i);
+      const bordeMatch = imgTag.match(/data-borde="([^"]*)"/i);
+      const alignMatch = imgTag.match(/data-alineacion="([^"]*)"/i);
+
+      let bordeDetectado = bordeMatch ? bordeMatch[1] : 'cuadrado';
+      if (!bordeMatch && imgTag.includes('9999px')) bordeDetectado = 'circular';
+      else if (!bordeMatch && (imgTag.includes('12px') || imgTag.includes('14px'))) bordeDetectado = 'redondeado';
+
+      let alignDetectado = alignMatch ? alignMatch[1] : 'centro';
+      if (!alignMatch && imgTag.includes('margin: 12px auto 12px 0')) alignDetectado = 'izquierda';
+      else if (!alignMatch && imgTag.includes('margin: 12px 0 12px auto')) alignDetectado = 'derecha';
+
+      return {
+        indice: idx,
+        tagOriginal: imgTag,
+        src: srcMatch ? srcMatch[1] : '',
+        ancho: widthMatch ? widthMatch[1].trim() : '50%',
+        borde: bordeDetectado as 'cuadrado' | 'redondeado' | 'circular',
+        alineacion: alignDetectado as 'izquierda' | 'centro' | 'derecha'
+      };
+    });
+  };
+
+  // MODIFICAR PROPIEDADES (TAMAÑO, ALINEACIÓN, ESQUINAS REDONDAS/CUADRADAS) DE UNA IMAGEN ESPECÍFICA DENTRO DEL TEXTO
+  const actualizarImagenEspecificaEnTexto = (
+    bloqueId: string,
+    columnaDestino: 1 | 2 | 3,
+    indiceImg: number,
+    nuevosValores: { ancho?: string; alineacion?: 'izquierda' | 'centro' | 'derecha'; borde?: 'cuadrado' | 'redondeado' | 'circular' }
+  ) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTexto;
     if (!bloque || bloque.tipo !== 'texto') return;
 
     const campo = columnaDestino === 2 ? 'contenidoCol2' : columnaDestino === 3 ? 'contenidoCol3' : 'contenido';
     const htmlActual = String((bloque as any)[campo] || '');
-    if (!htmlActual.includes('<img')) {
-      mostrarMensaje('No hay imágenes en esa columna de texto para redimensionar.', 'error');
-      return;
-    }
+    const lista = extraerImagenesDeColumnaTexto(htmlActual);
+    const objetivo = lista[indiceImg];
+    if (!objetivo) return;
 
-    const htmlActualizado = htmlActual.replace(/<img([^>]*)>/gi, (match, attrs) => {
-      const sinWidth = String(attrs).replace(/style="[^"]*"/gi, '').replace(/width="[^"]*"/gi, '');
-      return `<img ${sinWidth.trim()} width="${nuevoAncho}" style="width: ${nuevoAncho}; max-width: 100%; height: auto; display: inline-block; border-radius: 12px;">`;
+    const nuevoAncho = nuevosValores.ancho ?? objetivo.ancho;
+    const nuevaAlineacion = nuevosValores.alineacion ?? objetivo.alineacion;
+    const nuevoBorde = nuevosValores.borde ?? objetivo.borde;
+    const nuevoEstilo = construirEstiloImagenTexto(nuevoAncho, nuevaAlineacion, nuevoBorde);
+
+    let contador = -1;
+    const htmlNuevo = htmlActual.replace(/<img\b[^>]*>/gi, (match) => {
+      contador++;
+      if (contador !== indiceImg) return match;
+      return `<img src="${objetivo.src}" alt="Imagen" width="${nuevoAncho}" data-borde="${nuevoBorde}" data-alineacion="${nuevaAlineacion}" style="${nuevoEstilo}" />`;
     });
 
-    (bloque as any)[campo] = htmlActualizado;
+    (bloque as any)[campo] = htmlNuevo;
     autoGuardar(nuevasPaginas);
-    mostrarMensaje(`Tamaño de imagen ajustado a ${nuevoAncho}`, 'exito');
+  };
+
+  // MOVER UNA IMAGEN ARRIBA O ABAJO ENTRE LOS PÁRRAFOS DEL BLOQUE DE TEXTO
+  const moverImagenEntreParrafosTexto = (
+    bloqueId: string,
+    columnaDestino: 1 | 2 | 3,
+    indiceImg: number,
+    direccion: 'arriba' | 'abajo'
+  ) => {
+    if (typeof document === 'undefined') return;
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTexto;
+    if (!bloque || bloque.tipo !== 'texto') return;
+
+    const campo = columnaDestino === 2 ? 'contenidoCol2' : columnaDestino === 3 ? 'contenidoCol3' : 'contenido';
+    const htmlActual = String((bloque as any)[campo] || '');
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlActual;
+    const todasLasImgs = tempDiv.querySelectorAll('img');
+    const imgTarget = todasLasImgs[indiceImg];
+    if (!imgTarget) return;
+
+    // Encontrar el nodo de bloque superior (p, div, h1..h6, li) que contiene la imagen
+    let bloquePadre: HTMLElement | null = imgTarget as HTMLElement;
+    while (bloquePadre && bloquePadre.parentElement && bloquePadre.parentElement !== tempDiv) {
+      bloquePadre = bloquePadre.parentElement;
+    }
+    if (!bloquePadre) return;
+
+    // Si el párrafo tiene texto además de la imagen, separamos la imagen en su propio párrafo para moverla libremente
+    if ((bloquePadre.textContent || '').trim().length > 0) {
+      const nuevoParrafoImg = document.createElement('p');
+      nuevoParrafoImg.appendChild(imgTarget.cloneNode(true));
+      imgTarget.remove();
+      if (direccion === 'arriba') {
+        tempDiv.insertBefore(nuevoParrafoImg, bloquePadre);
+      } else {
+        if (bloquePadre.nextSibling) {
+          tempDiv.insertBefore(nuevoParrafoImg, bloquePadre.nextSibling);
+        } else {
+          tempDiv.appendChild(nuevoParrafoImg);
+        }
+      }
+    } else {
+      if (direccion === 'arriba' && bloquePadre.previousElementSibling) {
+        tempDiv.insertBefore(bloquePadre, bloquePadre.previousElementSibling);
+      } else if (direccion === 'abajo' && bloquePadre.nextElementSibling) {
+        tempDiv.insertBefore(bloquePadre.nextElementSibling, bloquePadre);
+      } else {
+        mostrarMensaje(direccion === 'arriba' ? 'La imagen ya está al inicio del bloque.' : 'La imagen ya está al final del bloque.', 'error');
+        return;
+      }
+    }
+
+    (bloque as any)[campo] = tempDiv.innerHTML;
+    autoGuardar(nuevasPaginas);
+    mostrarMensaje(direccion === 'arriba' ? 'Imagen subida un párrafo' : 'Imagen bajada un párrafo', 'exito');
+  };
+
+  // ELIMINAR UNA IMAGEN ESPECÍFICA DENTRO DE UN BLOQUE DE TEXTO
+  const eliminarImagenDeColumnaTexto = (bloqueId: string, columnaDestino: 1 | 2 | 3, indiceImg: number) => {
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTexto;
+    if (!bloque || bloque.tipo !== 'texto') return;
+
+    const campo = columnaDestino === 2 ? 'contenidoCol2' : columnaDestino === 3 ? 'contenidoCol3' : 'contenido';
+    const htmlActual = String((bloque as any)[campo] || '');
+
+    let contador = -1;
+    const htmlSinImg = htmlActual
+      .replace(/<img\b[^>]*>/gi, (match) => {
+        contador++;
+        return contador === indiceImg ? '' : match;
+      })
+      .replace(/<p[^>]*>\s*<\/p>/gi, '');
+
+    (bloque as any)[campo] = htmlSinImg;
+    autoGuardar(nuevasPaginas);
+    mostrarMensaje('Imagen eliminada del bloque de texto', 'exito');
   };
 
   const manejarSubidaImagenConfig = async (e: React.ChangeEvent<HTMLInputElement>, campo: keyof ConfiguracionEdicion) => {
@@ -1099,7 +1339,6 @@ export default function AdminPage() {
     cambiarPagina(indicePaginaActual + 1);
   };
 
-  // FUNCIÓN PARA DUPLICAR LA PÁGINA ACTUAL COMPLETA (CON SUS TABLAS Y GRÁFICAS RECONECTADAS)
   const duplicarPaginaActual = () => {
     const actual = paginas[indicePaginaActual];
     if (!actual) return;
@@ -1194,6 +1433,8 @@ export default function AdminPage() {
       id: generarId(),
       tipo: 'firma',
       alineacion: 'espaciado',
+      espacioGeneralSuperior: 0,
+      espacioGeneralInferior: 0,
       colorFondo: 'transparent',
       firmas: [
         {
@@ -1202,7 +1443,8 @@ export default function AdminPage() {
           nombre: 'Luis Alberto González Araujo',
           cargo: 'Director ejecutivo ACOFI',
           infoAdicional: '',
-          tamanoFirma: 72
+          tamanoFirma: 72,
+          espacioSuperior: 0
         }
       ]
     });
@@ -1340,6 +1582,15 @@ export default function AdminPage() {
     }
   };
 
+  const actualizarPropiedadBloqueFirma = (bloqueId: string, campo: keyof BloqueFirma, valor: any) => {
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueFirma;
+    if (bloque && bloque.tipo === 'firma') {
+      (bloque as any)[campo] = valor;
+      autoGuardar(nuevasPaginas);
+    }
+  };
+
   const agregarSegundaFirmaAlBloque = (bloqueId: string) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueFirma;
@@ -1350,7 +1601,8 @@ export default function AdminPage() {
         nombre: 'José Miguel Solano Araujo',
         cargo: 'Asistente de proyectos ACOFI',
         infoAdicional: 'Editor de la publicación',
-        tamanoFirma: 72
+        tamanoFirma: 72,
+        espacioSuperior: 0
       });
       autoGuardar(nuevasPaginas);
     }
@@ -1691,7 +1943,7 @@ export default function AdminPage() {
     });
   };
 
-  // CAPTURA INTELIGENTE DEL TEXTO SOMBREADO EN EL EDITOR (SIN TENER QUE VOLVER A ESCRIBIRLO)
+  // CAPTURA INTELIGENTE TANTO DE LA POSICIÓN EXACTA DEL CURSOR COMO DEL TEXTO SOMBREADO EN EL EDITOR
   const capturarSeleccionEditor = (
     bloqueId: string,
     columna: 1 | 2 | 3,
@@ -1701,21 +1953,32 @@ export default function AdminPage() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
 
+    const range = sel.getRangeAt(0);
+    const contenedor = e.currentTarget.querySelector('.ql-editor') as HTMLElement | null;
+    if (!contenedor || !contenedor.contains(range.commonAncestorContainer)) return;
+
+    // Guardar siempre la última posición del cursor para poder insertar imágenes justo en medio del texto
+    ultimoRangoCursorRef.current = {
+      bloqueId,
+      columna,
+      range: range.cloneRange(),
+      contenedor
+    };
+
+    const selectImgCol = document.getElementById(`img-col-${bloqueId}`) as HTMLSelectElement | null;
+    if (selectImgCol) selectImgCol.value = String(columna);
+
     const texto = sel.toString().trim();
     if (!texto) return;
 
-    const range = sel.getRangeAt(0);
-    const contenedor = e.currentTarget.querySelector('.ql-editor') as HTMLElement | null;
-    if (contenedor && contenedor.contains(range.commonAncestorContainer)) {
-      rangoSeleccionRef.current = range.cloneRange();
-      editorContenedorRef.current = contenedor;
-      setSeleccionTextoActiva({ bloqueId, columna, texto });
+    rangoSeleccionRef.current = range.cloneRange();
+    editorContenedorRef.current = contenedor;
+    setSeleccionTextoActiva({ bloqueId, columna, texto });
 
-      const inputTxt = document.getElementById(`link-txt-${bloqueId}`) as HTMLInputElement | null;
-      if (inputTxt) inputTxt.value = texto;
-      const selectCol = document.getElementById(`link-col-${bloqueId}`) as HTMLSelectElement | null;
-      if (selectCol) selectCol.value = String(columna);
-    }
+    const inputTxt = document.getElementById(`link-txt-${bloqueId}`) as HTMLInputElement | null;
+    if (inputTxt) inputTxt.value = texto;
+    const selectCol = document.getElementById(`link-col-${bloqueId}`) as HTMLSelectElement | null;
+    if (selectCol) selectCol.value = String(columna);
   };
 
   // ENLAZAR EL TEXTO SELECCIONADO (O ESCRITO) CON PERSONALIZACIÓN DE COLOR Y SUBRAYADO (SÍ/NO)
@@ -1743,7 +2006,6 @@ export default function AdminPage() {
     const decoStyle = conSubrayado ? 'underline' : 'none';
     const estiloLink = `color: ${colorEnlace} !important; text-decoration: ${decoStyle} !important; font-weight: 700; cursor: pointer;`;
 
-    // 1. Si el usuario sombreó texto directamente en el editor, envolvemos el Range exacto en el DOM de Quill
     if (
       seleccionTextoActiva &&
       seleccionTextoActiva.bloqueId === bloqueId &&
@@ -1777,11 +2039,10 @@ export default function AdminPage() {
         mostrarMensaje(tipoDestino === 'pagina' ? 'Texto seleccionado enlazado a la página' : 'Texto seleccionado enlazado a la URL', 'exito');
         return;
       } catch (err) {
-        // Si el rango cambió, continúa con el reemplazo sobre el HTML
+        // Fallback al reemplazo HTML
       }
     }
 
-    // 2. Respaldo: reemplazo directo en el HTML o inserción al final si no había selección previa
     const textoSeleccionadoNavegador = typeof window !== 'undefined' ? (window.getSelection()?.toString().trim() || '') : '';
     const textoUsar = textoManual.trim() || seleccionTextoActiva?.texto || textoSeleccionadoNavegador || 'Ir a la página';
 
@@ -1915,7 +2176,6 @@ export default function AdminPage() {
     p.bloques.filter(b => b.tipo === 'tabla').map(b => ({ ...(b as BloqueTabla), nombrePagina: p.titulo || `Hoja ${pIdx + 1}` }))
   );
 
-  // PARSEADOR INFALIBLE PARA PORCENTAJES (%), DECIMALES Y MILES
   const parseValor = (val: any) => {
     if (val === undefined || val === null) return 0;
     if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -2274,6 +2534,7 @@ export default function AdminPage() {
                     <feDropShadow dx="0" dy="14" stdDeviation="8" floodColor="#0f172a" floodOpacity="0.35" />
                   </filter>
                 </defs>
+                {/* Capa de profundidad 3D: legendType="none" y tooltipType="none" evitan duplicados en la leyenda */}
                 <Pie 
                   data={datos} 
                   cx="50%" 
@@ -2283,6 +2544,8 @@ export default function AdminPage() {
                   paddingAngle={sinHueco ? 0 : 4} 
                   dataKey={nombreY} 
                   isAnimationActive={false}
+                  legendType="none"
+                  tooltipType="none"
                 >
                   {datos.map((_, i) => (
                     <Cell key={`depth-${i}`} fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} style={{ filter: 'brightness(0.62)' }} stroke="none" />
@@ -2599,7 +2862,12 @@ export default function AdminPage() {
   // RENDERIZADOR INFALIBLE DE BOTONES INLINE DENTRO DEL TEXTO (SOPORTA SOLIDO, PILDORA, CONTORNO, 3D Y 4D)
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
-    return html.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
+    const htmlSinNbsp = html.replace(/&nbsp;|&#160;|\u00A0/gi, ' ');
+    const htmlConSaltosPreservados = htmlSinNbsp
+      .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
+      .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
+
+    return htmlConSaltosPreservados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
       const limpio = String(contenidoInterno)
         .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
@@ -2609,7 +2877,6 @@ export default function AdminPage() {
       const texto = partes[0] || 'Ver más';
       const url = partes[1] || '#';
 
-      // Compatibilidad si el botón antiguo tenía 3 parámetros [[BOTON|Texto|URL|#color]]
       let estiloRaw = 'solido';
       let cFondo = '#1d4ed8';
       let cTexto = '#ffffff';
@@ -2659,7 +2926,7 @@ export default function AdminPage() {
   `;
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden relative">
+    <div className={`${generandoPdfAdmin ? 'min-h-screen w-full overflow-visible block bg-[#fdfbf7]' : 'flex h-screen bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden relative'}`}>
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_FUENTES_QUILL }} />
       
       {mensaje && (
@@ -2669,7 +2936,7 @@ export default function AdminPage() {
       )}
 
       {/* MENÚ LATERAL COLAPSABLE (BIBLIOTECA DE EDICIONES) */}
-      {menuLateralAbierto && (
+      {menuLateralAbierto && !generandoPdfAdmin && (
         <aside className="w-80 bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0 shadow-sm transition-all duration-300 no-print">
           <div className="px-6 py-8 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -2726,13 +2993,13 @@ export default function AdminPage() {
         </aside>
       )}
 
-      {/* VISTA DE IMPRESIÓN / EXPORTACIÓN PDF OFICIAL DESDE EL ADMIN */}
+      {/* VISTA DE IMPRESIÓN / EXPORTACIÓN PDF OFICIAL DESDE EL ADMIN (FLUJO NATIVO PARA QUE IMPRIMA LAS 120 PÁGINAS IDÉNTICAS AL LIBRO) */}
       {generandoPdfAdmin && (
-        <div className="fixed inset-0 z-99999 bg-[#fdfbf7] overflow-y-auto p-12 font-serif text-stone-900">
-          <div className="max-w-4xl mx-auto space-y-16">
+        <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
+          <div className="max-w-5xl mx-auto">
             
             {/* Portada en PDF */}
-            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10">
+            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
               {configuracion.logoUrl && (
                 <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
               )}
@@ -2746,15 +3013,22 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Páginas en PDF */}
+            {/* Todas las Páginas del Libro en PDF */}
             {paginas.map((p, pIdx) => {
               const tieneT = p.titulo.trim() !== '';
               const tieneSub = (p.subtitulo || '').trim() !== '';
               const mostrarNum = p.mostrarNumero !== false && tieneT;
+              const cabeceraMostrar = !textoVacioQuill(p.cabeceraHtml)
+                ? p.cabeceraHtml
+                : (configuracion.mostrarCabeceraGlobal && !textoVacioQuill(configuracion.cabeceraGlobalHtml) ? configuracion.cabeceraGlobalHtml : '');
+              const pieMostrar = !textoVacioQuill(p.piePaginaHtml)
+                ? p.piePaginaHtml
+                : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
+
               return (
                 <div key={p.id} className="print-page-sheet flex flex-col" style={{ backgroundColor: p.colorFondo || '#fdfbf7' }}>
-                  {p.cabeceraHtml && (
-                    <div className="mb-6 pb-3 border-b border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(p.cabeceraHtml) }} />
+                  {cabeceraMostrar && (
+                    <div className="mb-6 pb-3 border-b border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }} />
                   )}
                   {(tieneT || tieneSub) && (
                     <div className="mb-8 border-b border-stone-200 pb-4 print-avoid-break">
@@ -2770,23 +3044,53 @@ export default function AdminPage() {
                       <div key={b.id} className="w-full print-avoid-break">
                         {b.tipo === 'texto' && (
                           b.columnas === 2 || b.columnas === 3 ? (
-                            <div className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} items-start`}>
-                              <div className="prose prose-stone text-sm" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
-                              <div className="prose prose-stone text-sm border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
-                              {b.columnas === 3 && <div className="prose prose-stone text-sm border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
+                            <div 
+                              className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
+                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                            >
+                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
+                              {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
                             </div>
                           ) : (
-                            <div className="prose prose-stone text-sm text-justify" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                            <div 
+                              className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
+                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                              dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
+                            />
                           )
                         )}
                         {b.tipo === 'firma' && (
-                          <div className={`flex flex-wrap gap-8 items-end py-4 ${b.alineacion === 'centro' ? 'justify-center text-center' : b.alineacion === 'derecha' ? 'justify-end text-right' : 'justify-around text-left'}`}>
+                          <div 
+                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-10 items-end ${
+                              b.alineacion === 'centro' ? 'justify-center text-center' :
+                              b.alineacion === 'derecha' ? 'justify-end text-right' :
+                              b.alineacion === 'espaciado' ? 'justify-around text-left' :
+                              'justify-start text-left'
+                            }`}
+                            style={{ 
+                              backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
+                              paddingTop: `${(b.espacioGeneralSuperior ?? 0) + 16}px`,
+                              paddingBottom: `${(b.espacioGeneralInferior ?? 0) + 16}px`
+                            }}
+                          >
                             {(b.firmas || []).map((f, i) => (
-                              <div key={i} className="flex flex-col space-y-1">
-                                {f.url && <img src={f.url} alt={f.nombre} style={{ height: `${f.tamanoFirma ?? 60}px` }} className="w-auto object-contain mb-1" />}
-                                <span className="font-sans font-bold text-stone-900 text-sm">{f.nombre}</span>
-                                <span className="font-sans text-stone-600 text-xs">{f.cargo}</span>
-                                {f.infoAdicional && <span className="font-sans text-stone-500 text-[11px] italic">{f.infoAdicional}</span>}
+                              <div 
+                                key={i} 
+                                className="flex flex-col space-y-1 min-w-52"
+                                style={{ marginTop: `${f.espacioSuperior || 0}px` }}
+                              >
+                                {f.url && (
+                                  <img 
+                                    src={f.url} 
+                                    alt={f.nombre} 
+                                    style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
+                                    className={`object-contain mb-2 ${b.alineacion === 'centro' ? 'mx-auto' : b.alineacion === 'derecha' ? 'ml-auto' : 'mr-auto'}`} 
+                                  />
+                                )}
+                                <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
+                                {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
+                                {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
                               </div>
                             ))}
                           </div>
@@ -2807,12 +3111,12 @@ export default function AdminPage() {
                           </div>
                         )}
                         {b.tipo === 'tabla' && !b.oculto && (
-                          <div className="border border-stone-300 rounded-xl overflow-hidden my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
                             <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase">{b.nombre}</div>
-                            <table className="w-full text-xs font-sans border-collapse">
+                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 13}px` }}>
                               <thead>
                                 <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
-                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold text-left">{c}</th>)}
+                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-stone-200">
@@ -2827,7 +3131,7 @@ export default function AdminPage() {
                           </div>
                         )}
                         {b.tipo === 'grafica' && (
-                          <div className="border border-stone-200 rounded-xl p-6 my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                          <div className="border border-stone-200 rounded-2xl p-6 my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
                             <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
                             {renderizarGrafica(b)}
                             {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
@@ -2841,8 +3145,8 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
-                  {p.piePaginaHtml && (
-                    <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(p.piePaginaHtml) }} />
+                  {pieMostrar && (
+                    <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrar) }} />
                   )}
                 </div>
               );
@@ -2851,1879 +3155,2013 @@ export default function AdminPage() {
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto bg-slate-50 relative no-print">
-        {edicionActiva ? (
-          <div className={`${menuLateralAbierto ? 'max-w-6xl' : 'max-w-full'} mx-auto p-6 lg:p-10 pb-32 transition-all duration-300`}>
-            
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6 border-b border-slate-200 pb-6">
-              <div className="flex items-start gap-4">
-                {!menuLateralAbierto && (
-                  <button
-                    onClick={() => setMenuLateralAbierto(true)}
-                    className="mt-1 p-3 bg-white border-2 border-slate-200 text-slate-700 hover:border-blue-500 hover:text-blue-600 rounded-xl shadow-xs transition-all flex items-center gap-2 text-xs font-bold shrink-0 cursor-pointer"
-                    title="Mostrar Biblioteca de Ediciones"
-                  >
-                    <PanelLeftOpen size={18} />
-                    <span>Biblioteca</span>
-                  </button>
-                )}
-                <div>
-                  <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-2 flex items-center gap-3">
-                    <Edit3 size={32} className="text-blue-600" /> Edición {edicionActiva.anio}
-                  </h2>
-                  <div className="flex items-center space-x-3 text-sm font-bold text-slate-400 uppercase tracking-widest">
-                    <Database size={16} /><span>Motor de Bloques Relacional</span>
-                    <span className="text-slate-300">•</span>
-                    <select
-                      value={edicionActiva.estado || 'borrador'}
-                      onChange={(e) => actualizarEstadoEdicion(e.target.value as 'publicado' | 'borrador')}
-                      className={`text-xs font-black uppercase px-3 py-1 rounded-full border outline-none cursor-pointer ${edicionActiva.estado === 'publicado' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-300'}`}
+      {!generandoPdfAdmin && (
+        <main className="flex-1 overflow-y-auto bg-slate-50 relative no-print">
+          {edicionActiva ? (
+            <div className={`${menuLateralAbierto ? 'max-w-6xl' : 'max-w-full'} mx-auto p-6 lg:p-10 pb-32 transition-all duration-300`}>
+              
+              <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6 border-b border-slate-200 pb-6">
+                <div className="flex items-start gap-4">
+                  {!menuLateralAbierto && (
+                    <button
+                      onClick={() => setMenuLateralAbierto(true)}
+                      className="mt-1 p-3 bg-white border-2 border-slate-200 text-slate-700 hover:border-blue-500 hover:text-blue-600 rounded-xl shadow-xs transition-all flex items-center gap-2 text-xs font-bold shrink-0 cursor-pointer"
+                      title="Mostrar Biblioteca de Ediciones"
                     >
-                      <option value="borrador">⚠️ Borrador</option>
-                      <option value="publicado">✅ Publicado</option>
-                    </select>
+                      <PanelLeftOpen size={18} />
+                      <span>Biblioteca</span>
+                    </button>
+                  )}
+                  <div>
+                    <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-2 flex items-center gap-3">
+                      <Edit3 size={32} className="text-blue-600" /> Edición {edicionActiva.anio}
+                    </h2>
+                    <div className="flex items-center space-x-3 text-sm font-bold text-slate-400 uppercase tracking-widest">
+                      <Database size={16} /><span>Motor de Bloques Relacional</span>
+                      <span className="text-slate-300">•</span>
+                      <select
+                        value={edicionActiva.estado || 'borrador'}
+                        onChange={(e) => actualizarEstadoEdicion(e.target.value as 'publicado' | 'borrador')}
+                        className={`text-xs font-black uppercase px-3 py-1 rounded-full border outline-none cursor-pointer ${edicionActiva.estado === 'publicado' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-300'}`}
+                      >
+                        <option value="borrador">⚠️ Borrador</option>
+                        <option value="publicado">✅ Publicado</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={descargarRespaldoJson}
+                    className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 px-4 py-3 rounded-xl hover:border-slate-400 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
+                    title="Descargar copia de seguridad completa en formato JSON"
+                  >
+                    <FileJson size={18} className="text-emerald-600" /> <span>Descargar JSON</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={descargarLibroPdfAdmin}
+                    disabled={generandoPdfAdmin}
+                    className="flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-5 py-3 rounded-xl hover:bg-emerald-100 transition-all shadow-xs cursor-pointer"
+                    title="Exportar todo el libro completo en PDF editorial listo para imprimir"
+                  >
+                    <Printer size={18} /> <span>{generandoPdfAdmin ? 'Preparando PDF...' : 'Descargar PDF'}</span>
+                  </button>
+                  <a href={`/?edicion=${edicionActiva.anio}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100/50 border border-blue-200 px-6 py-3 rounded-xl hover:bg-blue-100 hover:shadow-md transition-all">
+                    <Eye size={18} /> <span>Ver Libro Público</span>
+                  </a>
+                </div>
               </div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={descargarRespaldoJson}
-                  className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 px-4 py-3 rounded-xl hover:border-slate-400 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
-                  title="Descargar copia de seguridad completa en formato JSON"
-                >
-                  <FileJson size={18} className="text-emerald-600" /> <span>Descargar JSON</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={descargarLibroPdfAdmin}
-                  disabled={generandoPdfAdmin}
-                  className="flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-5 py-3 rounded-xl hover:bg-emerald-100 transition-all shadow-xs cursor-pointer"
-                  title="Exportar todo el libro completo en PDF editorial listo para imprimir"
-                >
-                  <Printer size={18} /> <span>{generandoPdfAdmin ? 'Preparando PDF...' : 'Descargar PDF'}</span>
-                </button>
-                <a href={`/?edicion=${edicionActiva.anio}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100/50 border border-blue-200 px-6 py-3 rounded-xl hover:bg-blue-100 hover:shadow-md transition-all">
-                  <Eye size={18} /> <span>Ver Libro Público</span>
-                </a>
+
+              <div className="flex space-x-8 mb-10 border-b border-slate-200">
+                <button onClick={() => setPestañaActiva('diseno')} className={`pb-4 text-sm font-bold transition-colors relative flex items-center gap-2 cursor-pointer ${pestañaActiva === 'diseno' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}><Layout size={18} /> Propiedades de Revista {pestañaActiva === 'diseno' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 rounded-t-full"></div>}</button>
+                <button onClick={() => setPestañaActiva('contenido')} className={`pb-4 text-sm font-bold transition-colors relative flex items-center gap-2 cursor-pointer ${pestañaActiva === 'contenido' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}><Type size={18} /> Constructor de Páginas {pestañaActiva === 'contenido' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 rounded-t-full"></div>}</button>
               </div>
-            </div>
 
-            <div className="flex space-x-8 mb-10 border-b border-slate-200">
-              <button onClick={() => setPestañaActiva('diseno')} className={`pb-4 text-sm font-bold transition-colors relative flex items-center gap-2 cursor-pointer ${pestañaActiva === 'diseno' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}><Layout size={18} /> Propiedades de Revista {pestañaActiva === 'diseno' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 rounded-t-full"></div>}</button>
-              <button onClick={() => setPestañaActiva('contenido')} className={`pb-4 text-sm font-bold transition-colors relative flex items-center gap-2 cursor-pointer ${pestañaActiva === 'contenido' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}><Type size={18} /> Constructor de Páginas {pestañaActiva === 'contenido' && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 rounded-t-full"></div>}</button>
-            </div>
-
-            {pestañaActiva === 'diseno' && (
-              <form onSubmit={manejarGuardadoManual} className="space-y-8 animate-in fade-in duration-500">
-                
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200">
-                  <div className="bg-slate-50 border-b border-slate-200 p-6 flex justify-between items-center rounded-t-3xl">
-                    <h3 className="text-lg font-black text-slate-800">1. Identidad Principal y Colores</h3>
-                    <button 
-                      type="submit" 
-                      disabled={guardando} 
-                      className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer"
-                    >
-                      <Save size={16} /> <span>Guardar Cambios</span>
-                    </button>
-                  </div>
-                  <div className="p-8 space-y-8">
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Nombre de la Edición (Interno)</label>
-                        <input 
-                          type="text" 
-                          value={edicionActiva.titulo || ''} 
-                          onChange={(e) => {
-                            const nuevo = { ...edicionActiva, titulo: e.target.value };
-                            setEdicionActiva(nuevo);
-                            supabase.from('ediciones').update({ titulo: e.target.value }).eq('id', edicionActiva.id);
-                          }} 
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
-                          required 
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Estado de Publicación</label>
-                        <select
-                          value={edicionActiva.estado || 'borrador'}
-                          onChange={(e) => actualizarEstadoEdicion(e.target.value as 'publicado' | 'borrador')}
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-base outline-none focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value="borrador">Borrador (Privado)</option>
-                          <option value="publicado">Publicado (Público)</option>
-                        </select>
-                      </div>
+              {pestañaActiva === 'diseno' && (
+                <form onSubmit={manejarGuardadoManual} className="space-y-8 animate-in fade-in duration-500">
+                  
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200">
+                    <div className="bg-slate-50 border-b border-slate-200 p-6 flex justify-between items-center rounded-t-3xl">
+                      <h3 className="text-lg font-black text-slate-800">1. Identidad Principal y Colores</h3>
+                      <button 
+                        type="submit" 
+                        disabled={guardando} 
+                        className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer"
+                      >
+                        <Save size={16} /> <span>Guardar Cambios</span>
+                      </button>
                     </div>
-                    
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Textos de la Portada (Editor Completo)</label>
-                      <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5">
-                        <ReactQuill 
-                          theme="snow" 
-                          modules={quillModules} 
-                          value={configuracion.portadaContenido !== undefined ? configuracion.portadaContenido : contenidoPortadaPorDefecto} 
-                          onChange={(val) => actualizarConfiguracion('portadaContenido', val)} 
-                        />
-                      </div>
-                      <p className="text-xs text-slate-500 mt-2">Personaliza el título, subtítulo, tamaños y colores que aparecerán al inicio de la revista.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4 border-t border-slate-100">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Año Comercial</label>
-                        <input 
-                          type="number" 
-                          value={edicionActiva.anio || ''} 
-                          onChange={(e) => {
-                             setEdicionActiva({ ...edicionActiva, anio: e.target.value });
-                             supabase.from('ediciones').update({ anio: e.target.value }).eq('id', edicionActiva.id);
-                          }} 
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
-                          required 
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Color Tema (HEX)</label>
-                        <div className="flex gap-3 items-center">
-                          <input 
-                            type="color" 
-                            value={edicionActiva.color_principal || '#1d4ed8'} 
-                            onChange={(e) => actualizarColorTema(e.target.value)} 
-                            className="w-14 h-14 cursor-pointer rounded-xl border-2 shrink-0" 
-                          />
+                    <div className="p-8 space-y-8">
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Nombre de la Edición (Interno)</label>
                           <input 
                             type="text" 
-                            value={edicionActiva.color_principal || ''} 
-                            onChange={(e) => actualizarColorTema(e.target.value)} 
-                            className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-base outline-none focus:border-blue-500" 
+                            value={edicionActiva.titulo || ''} 
+                            onChange={(e) => {
+                              const nuevo = { ...edicionActiva, titulo: e.target.value };
+                              setEdicionActiva(nuevo);
+                              supabase.from('ediciones').update({ titulo: e.target.value }).eq('id', edicionActiva.id);
+                            }} 
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
                             required 
                           />
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Fondo de Portada</label>
-                        <div className="flex gap-3 items-center">
-                          <input 
-                            type="color" 
-                            value={configuracion.colorFondoPortada || '#fdfbf7'} 
-                            onChange={(e) => actualizarConfiguracion('colorFondoPortada', e.target.value)} 
-                            className="w-14 h-14 cursor-pointer rounded-xl border-2 shrink-0" 
-                          />
-                          <input 
-                            type="text" 
-                            value={configuracion.colorFondoPortada || '#fdfbf7'} 
-                            onChange={(e) => actualizarConfiguracion('colorFondoPortada', e.target.value)} 
-                            className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-base outline-none focus:border-blue-500" 
-                          />
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Estado de Publicación</label>
+                          <select
+                            value={edicionActiva.estado || 'borrador'}
+                            onChange={(e) => actualizarEstadoEdicion(e.target.value as 'publicado' | 'borrador')}
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-base outline-none focus:border-blue-500 cursor-pointer"
+                          >
+                            <option value="borrador">Borrador (Privado)</option>
+                            <option value="publicado">Publicado (Público)</option>
+                          </select>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="bg-slate-50 border-b border-slate-200 p-6 flex items-center gap-3">
-                    <ImagePlus className="text-blue-600" />
-                    <h3 className="text-lg font-black text-slate-800">2. Multimedia y Branding Global</h3>
-                  </div>
-                  <div className="p-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <RenderUploadConfig campo="imagenFondoPortada" label="Imagen Fondo (Portada)" placeholder="URL de imagen de fondo..." />
                       
-                      <div className="space-y-4">
-                        <RenderUploadConfig campo="logoUrl" label="Logo Superior (Páginas)" placeholder="URL del logo en PNG/SVG..." />
-                        {configuracion.logoUrl && (
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                            <div>
-                              <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
-                                <span>Tamaño del Logo</span>
-                                <span className="text-blue-600">{configuracion.logoSize ?? 56}px</span>
-                              </label>
-                              <input type="range" min="20" max="250" value={configuracion.logoSize ?? 56} onChange={(e) => actualizarConfiguracion('logoSize', Number(e.target.value))} className="w-full accent-blue-600" />
-                            </div>
-                            <div>
-                              <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
-                                <span>Luminosidad</span>
-                                <span className="text-blue-600">{configuracion.logoBrightness ?? 100}%</span>
-                              </label>
-                              <input type="range" min="0" max="200" value={configuracion.logoBrightness ?? 100} onChange={(e) => actualizarConfiguracion('logoBrightness', Number(e.target.value))} className="w-full accent-blue-600" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-4">
-                        <RenderUploadConfig campo="marcaAguaUrl" label="Marca de Agua Central" placeholder="URL de la marca de agua..." />
-                        {configuracion.marcaAguaUrl && (
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                            <div>
-                              <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
-                                <span>Tamaño (Ancho Pantalla)</span>
-                                <span className="text-blue-600">{configuracion.marcaAguaSize ?? 40}%</span>
-                              </label>
-                              <input type="range" min="10" max="100" value={configuracion.marcaAguaSize ?? 40} onChange={(e) => actualizarConfiguracion('marcaAguaSize', Number(e.target.value))} className="w-full accent-blue-600" />
-                            </div>
-                            <div>
-                              <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
-                                <span>Visibilidad (Opacidad)</span>
-                                <span className="text-blue-600">{configuracion.marcaAguaOpacity ?? 5}%</span>
-                              </label>
-                              <input type="range" min="1" max="100" value={configuracion.marcaAguaOpacity ?? 5} onChange={(e) => actualizarConfiguracion('marcaAguaOpacity', Number(e.target.value))} className="w-full accent-blue-600" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-
-                    {configuracion.marcaAguaUrl && (
-                      <div className="mt-8 pt-8 border-t border-slate-200">
-                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4">¿En dónde mostrar la Marca de Agua?</h4>
-                        <div className="flex items-center gap-6 mb-6">
-                          <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
-                            <input 
-                              type="radio" 
-                              name="modoMarcaAgua" 
-                              checked={configuracion.modoMarcaAgua === 'todas'} 
-                              onChange={() => actualizarConfiguracion('modoMarcaAgua', 'todas')}
-                              className="w-4 h-4 text-blue-600"
-                            /> En todas las páginas
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
-                            <input 
-                              type="radio" 
-                              name="modoMarcaAgua" 
-                              checked={configuracion.modoMarcaAgua === 'seleccionadas'} 
-                              onChange={() => actualizarConfiguracion('modoMarcaAgua', 'seleccionadas')}
-                              className="w-4 h-4 text-blue-600"
-                            /> Elegir páginas específicas
-                          </label>
-                        </div>
-
-                        {configuracion.modoMarcaAgua === 'seleccionadas' && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                            {paginas.map((p, idx) => (
-                              <label key={p.id} className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer bg-white p-3 rounded-lg border border-slate-200 hover:border-blue-400">
-                                <input 
-                                  type="checkbox" 
-                                  checked={(configuracion.paginasMarcaAgua || []).includes(p.id)}
-                                  onChange={(e) => {
-                                    let arr = [...(configuracion.paginasMarcaAgua || [])];
-                                    if (e.target.checked) arr.push(p.id);
-                                    else arr = arr.filter(id => id !== p.id);
-                                    actualizarConfiguracion('paginasMarcaAgua', arr);
-                                  }}
-                                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                                />
-                                {p.titulo || `Página ${idx + 1}`}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. CABECERA Y PIE DE PÁGINA GLOBALES CON EDITOR PROFESIONAL */}
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200">
-                  <div className="bg-slate-50 border-b border-slate-200 p-6 flex items-center gap-3 rounded-t-3xl">
-                    <Type className="text-blue-600" />
-                    <h3 className="text-lg font-black text-slate-800">3. Cabecera y Pie de Página Globales (Opcional)</h3>
-                  </div>
-                  <div className="p-8 space-y-8">
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!configuracion.mostrarCabeceraGlobal}
-                          onChange={(e) => actualizarConfiguracion('mostrarCabeceraGlobal', e.target.checked)}
-                          className="w-4 h-4 rounded text-blue-600"
-                        />
-                        Habilitar Cabecera Global en todas las páginas de contenido
-                      </label>
-                      {configuracion.mostrarCabeceraGlobal && (
-                        <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-24">
-                          <ReactQuill
-                            theme="snow"
-                            modules={quillModules}
-                            value={configuracion.cabeceraGlobalHtml || ''}
-                            onChange={(val) => actualizarConfiguracion('cabeceraGlobalHtml', val)}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Textos de la Portada (Editor Completo)</label>
+                        <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5">
+                          <ReactQuill 
+                            theme="snow" 
+                            modules={quillModules} 
+                            value={configuracion.portadaContenido !== undefined ? configuracion.portadaContenido : contenidoPortadaPorDefecto} 
+                            onChange={(val) => actualizarConfiguracion('portadaContenido', val)} 
                           />
                         </div>
-                      )}
-                    </div>
+                        <p className="text-xs text-slate-500 mt-2">Personaliza el título, subtítulo, tamaños y colores que aparecerán al inicio de la revista.</p>
+                      </div>
 
-                    <div className="space-y-3 pt-4 border-t border-slate-100">
-                      <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!configuracion.mostrarPiePaginaGlobal}
-                          onChange={(e) => actualizarConfiguracion('mostrarPiePaginaGlobal', e.target.checked)}
-                          className="w-4 h-4 rounded text-blue-600"
-                        />
-                        Habilitar Pie de Página Global en todas las páginas de contenido
-                      </label>
-                      {configuracion.mostrarPiePaginaGlobal && (
-                        <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-24">
-                          <ReactQuill
-                            theme="snow"
-                            modules={quillModules}
-                            value={configuracion.piePaginaGlobalHtml || ''}
-                            onChange={(val) => actualizarConfiguracion('piePaginaGlobalHtml', val)}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4 border-t border-slate-100">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Año Comercial</label>
+                          <input 
+                            type="number" 
+                            value={edicionActiva.anio || ''} 
+                            onChange={(e) => {
+                               setEdicionActiva({ ...edicionActiva, anio: e.target.value });
+                               supabase.from('ediciones').update({ anio: e.target.value }).eq('id', edicionActiva.id);
+                            }} 
+                            className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
+                            required 
                           />
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-16 pt-10 border-t-2 border-red-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-red-50/50 p-8 rounded-3xl">
-                  <div>
-                    <h4 className="text-lg font-black text-red-700 flex items-center gap-2"><AlertCircle size={20} /> Zona de Eliminación</h4>
-                  </div>
-                  <button type="button" onClick={intentarEliminarEdicion} disabled={eliminando} className="shrink-0 flex items-center justify-center space-x-2 px-6 py-3.5 bg-white border-2 border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer">
-                    <Trash2 size={18} /> <span>{eliminando ? 'Eliminando...' : 'Eliminar Edición'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
 
-            {pestañaActiva === 'contenido' && paginaActiva && (
-              <div className="animate-in fade-in duration-500">
-                
-                {/* BARRA SUPERIOR DE NAVEGACIÓN DE PÁGINAS CON SALTO DIRECTO, DUPLICACIÓN Y EXPORTACIÓN */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-3 justify-between items-center mb-8 sticky top-4 z-40">
-                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-center md:justify-start">
-                    <button onClick={() => cambiarPagina(Math.max(0, indicePaginaActual - 1))} disabled={indicePaginaActual === 0} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 text-slate-600 cursor-pointer"><ChevronLeft size={20} /></button>
-                    
-                    {/* Selector desplegable rápido para saltar de la Hoja 1 a la 120 al instante en el Admin */}
-                    <select
-                      value={indicePaginaActual}
-                      onChange={(e) => cambiarPagina(Number(e.target.value))}
-                      className="font-bold text-slate-700 px-3 border-2 border-slate-200 hover:border-blue-400 py-2 rounded-lg text-sm bg-white outline-none max-w-60 truncate cursor-pointer"
-                      title="Saltar directamente a cualquier hoja"
-                    >
-                      {paginas.map((p, idx) => (
-                        <option key={p.id} value={idx}>
-                          Hoja {idx + 1} de {paginas.length} — {p.titulo || p.subtitulo || 'Sin título'}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Input numérico directo de salto de página */}
-                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1.5 rounded-lg" title="Escribe el número de hoja y presiona Enter">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Ir a:</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={paginas.length}
-                        placeholder={`${indicePaginaActual + 1}`}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const val = Number((e.target as HTMLInputElement).value);
-                            if (val >= 1 && val <= paginas.length) {
-                              cambiarPagina(val - 1);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }
-                        }}
-                        className="w-12 text-xs font-black text-blue-700 text-center bg-white border border-slate-200 rounded py-0.5 outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <button onClick={() => cambiarPagina(Math.min(paginas.length - 1, indicePaginaActual + 1))} disabled={indicePaginaActual === paginas.length - 1} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 text-slate-600 cursor-pointer"><ChevronRight size={20} /></button>
-                    
-                    <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block"></div>
-                    
-                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-lg">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase px-2 hidden lg:inline">Orden:</span>
-                      <button onClick={() => moverPagina('izq')} disabled={indicePaginaActual === 0} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Mover página a la izquierda"><MoveLeft size={14} /></button>
-                      <button onClick={() => moverPagina('der')} disabled={indicePaginaActual === paginas.length - 1} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Mover página a la derecha"><MoveRight size={14} /></button>
-                    </div>
-
-                    <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block"></div>
-
-                    <button onClick={agregarPagina} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"><Plus size={15} /> Nueva Pág</button>
-                    <button onClick={duplicarPaginaActual} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer" title="Duplicar esta página completa con sus bloques"><Copy size={15} /> Duplicar Pág</button>
-                    <button 
-                      onClick={() => setModalImportarJsonAbierto(true)} 
-                      className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                      title="Inyectar lote de páginas, tablas y gráficas desde JSON"
-                    >
-                      <Database size={14} /> Importar JSON
-                    </button>
-                    <button onClick={intentarEliminarPagina} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"><Trash2 size={15} /> Eliminar</button>
-                  </div>
-
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-center">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-3">
-                      {estadoGuardadoVivo === 'guardado' && <><CheckCircle2 size={14} className="text-green-500" /> Guardado</>}
-                      {estadoGuardadoVivo === 'escribiendo' && <><Edit3 size={14} className="text-blue-500" /> Cambios...</>}
-                      {estadoGuardadoVivo === 'guardando' && <><RefreshCcw size={14} className="text-yellow-500 animate-spin" /> Nube</>}
-                    </div>
-                  </div>
-                </div>
-
-                {/* CABECERA CONFIGURABLE DE LA PÁGINA: TÍTULO, SUBTÍTULO, NÚMERO, POSICIÓN, CABECERA Y PIE */}
-                <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                    <div className="w-full space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Título de la Página (Déjalo en blanco para ocultarlo)</label>
-                        <input
-                          type="text"
-                          value={paginaActiva.titulo}
-                          onChange={(e) => actualizarTituloPagina(e.target.value)}
-                          placeholder="Ej: Capítulo 1. Introducción (O deja vacío si es continuación)"
-                          className="text-3xl font-black tracking-tight text-slate-900 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full placeholder:text-slate-300 transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Subtítulo de la Página (Opcional)</label>
-                        <input
-                          type="text"
-                          value={paginaActiva.subtitulo || ''}
-                          onChange={(e) => actualizarCampoPagina('subtitulo', e.target.value)}
-                          placeholder="Escribe un subtítulo o descripción secundaria para esta hoja..."
-                          className="text-lg font-medium text-slate-600 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full placeholder:text-slate-300 transition-colors"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="shrink-0 flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <input 
-                        type="color" 
-                        value={paginaActiva.colorFondo || '#fdfbf7'} 
-                        onChange={(e) => actualizarColorFondoPagina(e.target.value)} 
-                        className="w-10 h-10 cursor-pointer rounded-lg border-2"
-                        title="Color de fondo de la página"
-                      />
-                      <div>
-                        <span className="block text-sm font-bold text-slate-800">Fondo de Página</span>
-                        <span className="block text-xs text-slate-500">{paginaActiva.colorFondo || '#fdfbf7'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-6 items-center">
-                    <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700 cursor-pointer bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={paginaActiva.mostrarNumero !== false}
-                        onChange={(e) => actualizarCampoPagina('mostrarNumero', e.target.checked)}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                      />
-                      Mostrar número de índice en el encabezado (Ej: &quot;1.&quot;, &quot;2.&quot;)
-                    </label>
-
-                    <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700 cursor-pointer bg-amber-50/70 px-4 py-2.5 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={paginaActiva.posicion === 'antes_portada'}
-                        onChange={(e) => actualizarCampoPagina('posicion', e.target.checked ? 'antes_portada' : 'despues_portada')}
-                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
-                      />
-                      Ubicar esta hoja ANTES de la Portada Principal (Pre-Portada)
-                    </label>
-                  </div>
-
-                  {/* CABECERA Y PIE DE PÁGINA PERSONALIZADOS PARA ESTA HOJA */}
-                  <details className="pt-3 border-t border-slate-100 group">
-                    <summary className="text-xs font-bold uppercase tracking-widest text-blue-600 cursor-pointer select-none flex items-center gap-2">
-                      <span>+ Configurar Cabecera y Pie de Página exclusivos para esta hoja</span>
-                    </summary>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cabecera de esta Página</label>
-                        <div className="bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-20">
-                          <ReactQuill
-                            theme="snow"
-                            modules={quillModules}
-                            value={paginaActiva.cabeceraHtml || ''}
-                            onChange={(val) => actualizarCampoPagina('cabeceraHtml', val)}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Pie de Página de esta Hoja</label>
-                        <div className="bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-20">
-                          <ReactQuill
-                            theme="snow"
-                            modules={quillModules}
-                            value={paginaActiva.piePaginaHtml || ''}
-                            onChange={(val) => actualizarCampoPagina('piePaginaHtml', val)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-                <div className="space-y-6">
-                  {paginaActiva.bloques.length === 0 && (
-                    <div className="border-4 border-dashed border-slate-200 rounded-3xl p-20 flex flex-col items-center justify-center text-slate-400 bg-white/50">
-                      <Layout size={48} className="mb-4 text-slate-300" />
-                      <h3 className="text-xl font-bold text-slate-600 mb-2">Esta página está vacía</h3>
-                      <p className="mb-6">Agrega un bloque estructural para comenzar a construirla.</p>
-                    </div>
-                  )}
-
-                  {paginaActiva.bloques.map((bloque, bIdx) => (
-                    <div key={bloque.id} className={`bg-white rounded-2xl shadow-sm border group ${bloque.tipo === 'tabla' && bloque.oculto ? 'border-amber-300 opacity-90' : 'border-slate-200'}`}>
-                      
-                      <div className={`px-4 py-3 flex flex-wrap gap-2 justify-between items-center border-b rounded-t-2xl ${bloque.tipo === 'tabla' && bloque.oculto ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-                        <div className="flex items-center gap-3 text-slate-400">
-                          <GripVertical size={16} className="cursor-grab active:cursor-grabbing hover:text-slate-600 hidden md:block" />
-                          <span className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${bloque.tipo === 'tabla' && bloque.oculto ? 'text-amber-700' : 'text-slate-500'}`}>
-                            {getBloqueIcon(bloque)}
-                            Bloque de {bloque.tipo} {bloque.tipo === 'tabla' && bloque.oculto && '(Oculto al público)'}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 flex-wrap">
-                          {/* SELECTOR DE 1, 2 O 3 COLUMNAS REALES EN BLOQUES DE TEXTO */}
-                          {bloque.tipo === 'texto' && (
-                            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
-                              <Columns size={13} className="text-blue-600" />
-                              <span className="text-[10px] font-black text-slate-500 uppercase">Diseño:</span>
-                              <select
-                                value={bloque.columnas || 1}
-                                onChange={(e) => actualizarCampoBloqueTexto(bloque.id, 'columnas', Number(e.target.value) as 1 | 2 | 3)}
-                                className="text-xs font-bold text-blue-700 bg-transparent outline-none cursor-pointer"
-                              >
-                                <option value={1}>1 Columna (Ancho completo)</option>
-                                <option value={2}>2 Columnas Paralelas (Lado a Lado)</option>
-                                <option value={3}>3 Columnas Paralelas</option>
-                              </select>
-                            </div>
-                          )}
-
-                          {/* CONTROLES DE DENSIDAD / ESPACIADO ENTRE FILAS Y TAMAÑO DE LETRA PARA TABLAS */}
-                          {bloque.tipo === 'tabla' && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => clonarTablaExistente(bloque)}
-                                className="flex items-center gap-1.5 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-bold transition-colors shadow-xs cursor-pointer"
-                                title="Duplicar esta tabla en esta misma página"
-                              >
-                                <Copy size={12} /> Clonar
-                              </button>
-                              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs" title="Reducir o ampliar el espacio vertical entre todas las filas (0px = ultra compacto)">
-                                <span className="text-[10px] font-black text-slate-500 uppercase">Espacio Filas:</span>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="24"
-                                  step="1"
-                                  value={bloque.paddingFila ?? 6}
-                                  onChange={(e) => actualizarPropiedadTabla(bloque.id, 'paddingFila', Number(e.target.value))}
-                                  className="w-16 accent-emerald-600 cursor-pointer"
-                                />
-                                <span className="text-[11px] font-black text-emerald-700 min-w-7 text-right">{bloque.paddingFila ?? 6}px</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs" title="Tamaño de letra de la tabla">
-                                <span className="text-[10px] font-black text-slate-500 uppercase">Letra:</span>
-                                <input
-                                  type="number"
-                                  min="8"
-                                  max="28"
-                                  value={bloque.tamanoTextoTabla ?? 14}
-                                  onChange={(e) => actualizarPropiedadTabla(bloque.id, 'tamanoTextoTabla', Number(e.target.value))}
-                                  className="w-11 text-xs font-bold text-slate-700 outline-none text-center"
-                                />
-                                <span className="text-[10px] text-slate-400">px</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* CONTROL DE ESCALA / TAMAÑO (%) PARA TABLAS Y GRÁFICAS */}
-                          {(bloque.tipo === 'tabla' || bloque.tipo === 'grafica') && (
-                            <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-xs">
-                              <span className="text-[10px] font-black text-slate-500 uppercase">Tamaño:</span>
-                              <input
-                                type="range"
-                                min="30"
-                                max="200"
-                                step="5"
-                                value={bloque.escala || 100}
-                                onChange={(e) => actualizarEscalaBloque(bloque.id, Number(e.target.value))}
-                                className="w-20 accent-blue-600 cursor-pointer"
-                              />
-                              <span className="text-xs font-black text-blue-600 min-w-10 text-right">{bloque.escala || 100}%</span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1 bg-slate-200/50 p-1 rounded-lg">
-                            <button onClick={() => moverBloque(bIdx, 'arriba')} disabled={bIdx === 0} className="p-1 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Subir bloque"><ArrowUp size={14} /></button>
-                            <button onClick={() => moverBloque(bIdx, 'abajo')} disabled={bIdx === paginaActiva.bloques.length - 1} className="p-1 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Bajar bloque"><ArrowDown size={14} /></button>
-                          </div>
-
-                          <div className="w-px h-4 bg-slate-300"></div>
-
-                          <div className="flex items-center gap-2 text-xs font-bold text-slate-400" title="Cambiar color de fondo general del bloque">
-                            <Palette size={14} />
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Color Tema (HEX)</label>
+                          <div className="flex gap-3 items-center">
                             <input 
                               type="color" 
-                              value={bloque.colorFondo || '#ffffff'} 
-                              onChange={(e) => actualizarColorFondoBloque(bloque.id, e.target.value)} 
-                              className="w-5 h-5 rounded cursor-pointer border-none p-0"
+                              value={edicionActiva.color_principal || '#1d4ed8'} 
+                              onChange={(e) => actualizarColorTema(e.target.value)} 
+                              className="w-14 h-14 cursor-pointer rounded-xl border-2 shrink-0" 
+                            />
+                            <input 
+                              type="text" 
+                              value={edicionActiva.color_principal || ''} 
+                              onChange={(e) => actualizarColorTema(e.target.value)} 
+                              className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-base outline-none focus:border-blue-500" 
+                              required 
                             />
                           </div>
-                          
-                          <div className="w-px h-4 bg-slate-300"></div>
-                          <button onClick={() => intentarEliminarBloque(bloque.id, bloque.tipo)} className="text-red-400 hover:text-red-600 transition-colors p-1 cursor-pointer"><Trash2 size={16} /></button>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Fondo de Portada</label>
+                          <div className="flex gap-3 items-center">
+                            <input 
+                              type="color" 
+                              value={configuracion.colorFondoPortada || '#fdfbf7'} 
+                              onChange={(e) => actualizarConfiguracion('colorFondoPortada', e.target.value)} 
+                              className="w-14 h-14 cursor-pointer rounded-xl border-2 shrink-0" 
+                            />
+                            <input 
+                              type="text" 
+                              value={configuracion.colorFondoPortada || '#fdfbf7'} 
+                              onChange={(e) => actualizarConfiguracion('colorFondoPortada', e.target.value)} 
+                              className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-base outline-none focus:border-blue-500" 
+                            />
+                          </div>
                         </div>
                       </div>
+                    </div>
+                  </div>
 
-                      <div className="p-0">
-                        {bloque.tipo === 'texto' && (
-                          <div>
-                            {/* BARRA FLOTANTE AUTOMÁTICA CUANDO EL USUARIO SOMBREA TEXTO EN EL EDITOR */}
-                            {seleccionTextoActiva && seleccionTextoActiva.bloqueId === bloque.id && (
-                              <div className="bg-slate-900 text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 animate-in fade-in duration-200">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="px-2 py-0.5 bg-blue-600 text-[10px] font-black uppercase rounded">Texto Seleccionado</span>
-                                  <span className="text-xs font-bold text-blue-200 truncate max-w-xs">&ldquo;{seleccionTextoActiva.texto}&rdquo;</span>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                  <select id={`float-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-800 text-white border border-slate-700 rounded-lg outline-none max-w-52">
-                                    <option value="">-- Elegir Página del Libro --</option>
-                                    {paginas.map((p, idx) => (
-                                      <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
-                                    ))}
-                                  </select>
-                                  <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700" title="Color del texto enlazado">
-                                    <span className="text-[10px] font-bold text-slate-300">Color:</span>
-                                    <input type="color" id={`float-color-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
-                                  </div>
-                                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">
-                                    <input type="checkbox" id={`float-under-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-500" />
-                                    Subrayado
-                                  </label>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const pagId = (document.getElementById(`float-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
-                                      const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
-                                      const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
-                                      if (!pagId) {
-                                        mostrarMensaje('Elige primero la página del libro en la lista desplegable.', 'error');
-                                        return;
-                                      }
-                                      enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'pagina', pagId, colHex, sub);
-                                    }}
-                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
-                                  >
-                                    Enlazar a Página
-                                  </button>
-                                  <input
-                                    type="text"
-                                    id={`float-url-${bloque.id}`}
-                                    placeholder="O pega URL..."
-                                    className="px-2.5 py-1.5 text-xs bg-slate-800 text-white border border-slate-700 rounded-lg outline-none w-32"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const urlEx = (document.getElementById(`float-url-${bloque.id}`) as HTMLInputElement)?.value || '';
-                                      const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
-                                      const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
-                                      if (!urlEx.trim()) {
-                                        mostrarMensaje('Escribe la URL externa.', 'error');
-                                        return;
-                                      }
-                                      enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'url', urlEx, colHex, sub);
-                                    }}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
-                                  >
-                                    Enlazar URL
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSeleccionTextoActiva(null)}
-                                    className="p-1 text-slate-400 hover:text-white cursor-pointer"
-                                    title="Cerrar barra de selección"
-                                  >
-                                    <X size={15} />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* EDITORES DE TEXTO EN 1, 2 O 3 COLUMNAS INDEPENDIENTES LADO A LADO */}
-                            <div 
-                              className={`grid grid-cols-1 ${bloque.columnas === 2 ? 'md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200' : bloque.columnas === 3 ? 'md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200' : ''}`}
-                              style={{ backgroundColor: bloque.colorFondo || 'transparent' }}
-                            >
-                              <div 
-                                className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
-                                onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 1, e)}
-                                onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 1, e)}
-                              >
-                                {(bloque.columnas === 2 || bloque.columnas === 3) && (
-                                  <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
-                                    Columna 1 (Izquierda)
-                                  </div>
-                                )}
-                                <ReactQuill theme="snow" modules={quillModules} value={bloque.contenido} onChange={(val) => actualizarBloqueTexto(bloque.id, val)} />
-                              </div>
-
-                              {(bloque.columnas === 2 || bloque.columnas === 3) && (
-                                <div 
-                                  className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
-                                  onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 2, e)}
-                                  onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 2, e)}
-                                >
-                                  <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
-                                    Columna 2 ({bloque.columnas === 2 ? 'Derecha' : 'Centro'})
-                                  </div>
-                                  <ReactQuill theme="snow" modules={quillModules} value={bloque.contenidoCol2 || ''} onChange={(val) => actualizarCampoBloqueTexto(bloque.id, 'contenidoCol2', val)} />
-                                </div>
-                              )}
-
-                              {bloque.columnas === 3 && (
-                                <div 
-                                  className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
-                                  onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 3, e)}
-                                  onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 3, e)}
-                                >
-                                  <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
-                                    Columna 3 (Derecha)
-                                  </div>
-                                  <ReactQuill theme="snow" modules={quillModules} value={bloque.contenidoCol3 || ''} onChange={(val) => actualizarCampoBloqueTexto(bloque.id, 'contenidoCol3', val)} />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* BARRA DE HERRAMIENTAS AVANZADA DEL BLOQUE DE TEXTO: ENLACES CON COLOR Y SUBRAYADO, IMÁGENES REDIMENSIONABLES Y BOTONES */}
-                            <div className="bg-slate-50 p-4 border-t border-slate-200 space-y-3 rounded-b-2xl">
-                              
-                              {/* 1. ENLAZAR TEXTO SELECCIONADO O LÍNEA DE ÍNDICE A PÁGINA DEL LIBRO O URL (CON COLOR Y SUBRAYADO CONFIGURABLES) */}
-                              <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
-                                <span className="text-[11px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-                                  <Link2 size={14} /> Enlazar Texto (Sombréalo arriba):
-                                </span>
-                                {(bloque.columnas === 2 || bloque.columnas === 3) && (
-                                  <select id={`link-col-${bloque.id}`} defaultValue="1" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                    <option value="1">Columna 1</option>
-                                    <option value="2">Columna 2</option>
-                                    {bloque.columnas === 3 && <option value="3">Columna 3</option>}
-                                  </select>
-                                )}
-                                <input
-                                  type="text"
-                                  id={`link-txt-${bloque.id}`}
-                                  placeholder="Sombrea texto arriba o escríbelo..."
-                                  className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 min-w-48"
-                                />
-                                <select id={`link-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-52">
-                                  <option value="">-- Elegir Página Destino --</option>
-                                  {paginas.map((p, idx) => (
-                                    <option key={p.id} value={p.id}>
-                                      Hoja {idx + 1}: {p.titulo || 'Sin título'}
-                                    </option>
-                                  ))}
-                                </select>
-                                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200" title="Elige el color del texto enlazado">
-                                  <span className="text-[10px] font-bold text-slate-500">Color:</span>
-                                  <input
-                                    type="color"
-                                    id={`link-color-${bloque.id}`}
-                                    defaultValue={edicionActiva?.color_principal || '#1d4ed8'}
-                                    className="w-5 h-5 rounded cursor-pointer border-0 p-0"
-                                  />
-                                </div>
-                                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
-                                  <input
-                                    type="checkbox"
-                                    id={`link-under-${bloque.id}`}
-                                    defaultChecked={true}
-                                    className="w-3.5 h-3.5 rounded text-blue-600"
-                                  />
-                                  Subrayado
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 border-b border-slate-200 p-6 flex items-center gap-3">
+                      <ImagePlus className="text-blue-600" />
+                      <h3 className="text-lg font-black text-slate-800">2. Multimedia y Branding Global</h3>
+                    </div>
+                    <div className="p-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <RenderUploadConfig campo="imagenFondoPortada" label="Imagen Fondo (Portada)" placeholder="URL de imagen de fondo..." />
+                        
+                        <div className="space-y-4">
+                          <RenderUploadConfig campo="logoUrl" label="Logo Superior (Páginas)" placeholder="URL del logo en PNG/SVG..." />
+                          {configuracion.logoUrl && (
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
+                                  <span>Tamaño del Logo</span>
+                                  <span className="text-blue-600">{configuracion.logoSize ?? 56}px</span>
                                 </label>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const col = Number((document.getElementById(`link-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
-                                    const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
-                                    const pagId = (document.getElementById(`link-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
-                                    const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
-                                    const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
-                                    if (!pagId) {
-                                      mostrarMensaje('Selecciona primero la página del libro a la que deseas redirigir.', 'error');
-                                      return;
-                                    }
-                                    enlazarTextoEnColumna(bloque.id, col, txt, 'pagina', pagId, colHex, sub);
-                                  }}
-                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs cursor-pointer"
-                                >
-                                  Enlazar a Página
-                                </button>
-                                <span className="text-[10px] font-bold text-slate-400">o URL:</span>
-                                <input
-                                  type="text"
-                                  id={`link-url-${bloque.id}`}
-                                  placeholder="https://..."
-                                  className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none w-32"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const col = Number((document.getElementById(`link-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
-                                    const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
-                                    const urlEx = (document.getElementById(`link-url-${bloque.id}`) as HTMLInputElement)?.value || '';
-                                    const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
-                                    const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
-                                    if (!urlEx.trim()) {
-                                      mostrarMensaje('Escribe la URL externa.', 'error');
-                                      return;
-                                    }
-                                    enlazarTextoEnColumna(bloque.id, col, txt, 'url', urlEx, colHex, sub);
-                                  }}
-                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                                >
-                                  Enlazar URL
-                                </button>
+                                <input type="range" min="20" max="250" value={configuracion.logoSize ?? 56} onChange={(e) => actualizarConfiguracion('logoSize', Number(e.target.value))} className="w-full accent-blue-600" />
                               </div>
-
-                              {/* 2. INSERTAR Y AJUSTAR TAMAÑO DE IMÁGENES DENTRO DEL BLOQUE DE TEXTO */}
-                              <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
-                                <span className="text-[11px] font-black text-pink-600 uppercase tracking-wider flex items-center gap-1.5">
-                                  <ImageIcon size={14} /> Imagen en Texto:
-                                </span>
-                                {(bloque.columnas === 2 || bloque.columnas === 3) && (
-                                  <select id={`img-col-${bloque.id}`} defaultValue="1" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                    <option value="1">Columna 1</option>
-                                    <option value="2">Columna 2</option>
-                                    {bloque.columnas === 3 && <option value="3">Columna 3</option>}
-                                  </select>
-                                )}
-                                <select id={`img-size-${bloque.id}`} defaultValue="50%" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                  <option value="20%">Tamaño: 20% (Miniatura)</option>
-                                  <option value="35%">Tamaño: 35% (Pequeña)</option>
-                                  <option value="50%">Tamaño: 50% (Mediana)</option>
-                                  <option value="75%">Tamaño: 75% (Grande)</option>
-                                  <option value="100%">Tamaño: 100% (Completa)</option>
-                                  <option value="180px">Fijo: 180px</option>
-                                  <option value="300px">Fijo: 300px</option>
-                                </select>
-                                <select id={`img-align-${bloque.id}`} defaultValue="centro" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                  <option value="izquierda">Alinear Izquierda</option>
-                                  <option value="centro">Centrada</option>
-                                  <option value="derecha">Alinear Derecha</option>
-                                </select>
-                                <div className="relative inline-block">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const col = Number((document.getElementById(`img-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
-                                      const sz = (document.getElementById(`img-size-${bloque.id}`) as HTMLSelectElement)?.value || '50%';
-                                      const al = (document.getElementById(`img-align-${bloque.id}`) as HTMLSelectElement)?.value || 'centro';
-                                      manejarSubidaImagenEnTexto(e, bloque.id, col, sz, al);
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                  />
-                                  <button type="button" className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer">
-                                    <Upload size={12} /> Subir Imagen al Texto
-                                  </button>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const col = Number((document.getElementById(`img-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
-                                    const sz = (document.getElementById(`img-size-${bloque.id}`) as HTMLSelectElement)?.value || '50%';
-                                    redimensionarImagenesEnTexto(bloque.id, col, sz);
-                                  }}
-                                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                                  title="Cambia el tamaño de las imágenes ya insertadas en este bloque al porcentaje seleccionado"
-                                >
-                                  Aplicar Tamaño a Imágenes Existentes
-                                </button>
-                              </div>
-
-                              {/* 3. GENERADOR DE BOTONES INLINE DENTRO DEL TEXTO (CON REDIRECCIÓN A PÁGINA O URL) */}
-                              <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
-                                <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                                  <MousePointerClick size={14} className="text-blue-600" /> Botón en Texto:
-                                </span>
-                                <input type="text" id={`in-btn-txt-${bloque.id}`} placeholder="Texto del botón" className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
-                                <input type="text" id={`in-btn-url-${bloque.id}`} placeholder="https://... o elige página" className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
-                                <select
-                                  onChange={(e) => {
-                                    const inputUrl = document.getElementById(`in-btn-url-${bloque.id}`) as HTMLInputElement;
-                                    if (inputUrl && e.target.value) inputUrl.value = `#pagina:${e.target.value}`;
-                                  }}
-                                  defaultValue=""
-                                  className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-44"
-                                >
-                                  <option value="">Ir a página...</option>
-                                  {paginas.map((p, idx) => (
-                                    <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
-                                  ))}
-                                </select>
-                                <select id={`in-btn-style-${bloque.id}`} defaultValue="solido" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
-                                  <option value="solido">Sólido</option>
-                                  <option value="pildora">Píldora (Ovalado)</option>
-                                  <option value="contorno">Contorno</option>
-                                  <option value="3d">3D Relieve</option>
-                                  <option value="4d">4D Glow (Iluminado)</option>
-                                </select>
-                                <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color principal del botón">
-                                  <span className="text-[10px] font-bold text-slate-500">Fondo:</span>
-                                  <input type="color" id={`in-btn-bg-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                                </div>
-                                <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color del texto">
-                                  <span className="text-[10px] font-bold text-slate-500">Texto:</span>
-                                  <input type="color" id={`in-btn-tc-${bloque.id}`} defaultValue="#ffffff" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                                </div>
-                                <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-blue-200" title="Color de iluminación (para 4D Glow)">
-                                  <span className="text-[10px] font-bold text-blue-600">Luz 4D:</span>
-                                  <input type="color" id={`in-btn-glow-${bloque.id}`} defaultValue="#60a5fa" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const txt = (document.getElementById(`in-btn-txt-${bloque.id}`) as HTMLInputElement)?.value || 'Ver más';
-                                    const url = (document.getElementById(`in-btn-url-${bloque.id}`) as HTMLInputElement)?.value || 'https://acofi.edu.co';
-                                    const est = (document.getElementById(`in-btn-style-${bloque.id}`) as HTMLSelectElement)?.value || 'solido';
-                                    const bg = (document.getElementById(`in-btn-bg-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
-                                    const tc = (document.getElementById(`in-btn-tc-${bloque.id}`) as HTMLInputElement)?.value || '#ffffff';
-                                    const glow = (document.getElementById(`in-btn-glow-${bloque.id}`) as HTMLInputElement)?.value || '#60a5fa';
-                                    const tag = `[[BOTON|${txt}|${url}|${est}|${bg}|${tc}|${glow}]]`;
-                                    actualizarBloqueTexto(bloque.id, `${bloque.contenido}<p>${tag}</p>`);
-                                  }}
-                                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
-                                >
-                                  + Insertar Botón
-                                </button>
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
+                                  <span>Luminosidad</span>
+                                  <span className="text-blue-600">{configuracion.logoBrightness ?? 100}%</span>
+                                </label>
+                                <input type="range" min="0" max="200" value={configuracion.logoBrightness ?? 100} onChange={(e) => actualizarConfiguracion('logoBrightness', Number(e.target.value))} className="w-full accent-blue-600" />
                               </div>
                             </div>
+                          )}
+                        </div>
 
-                            {bloque.contenido.includes('[[BOTON|') && (
-                              <div className="p-5 bg-white border-t border-dashed border-slate-200 rounded-b-2xl">
-                                <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Vista Previa Real del Texto con Botones:</span>
-                                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }} />
+                        <div className="space-y-4">
+                          <RenderUploadConfig campo="marcaAguaUrl" label="Marca de Agua Central" placeholder="URL de la marca de agua..." />
+                          {configuracion.marcaAguaUrl && (
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
+                                  <span>Tamaño (Ancho Pantalla)</span>
+                                  <span className="text-blue-600">{configuracion.marcaAguaSize ?? 40}%</span>
+                                </label>
+                                <input type="range" min="10" max="100" value={configuracion.marcaAguaSize ?? 40} onChange={(e) => actualizarConfiguracion('marcaAguaSize', Number(e.target.value))} className="w-full accent-blue-600" />
                               </div>
-                            )}
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-2">
+                                  <span>Visibilidad (Opacidad)</span>
+                                  <span className="text-blue-600">{configuracion.marcaAguaOpacity ?? 5}%</span>
+                                </label>
+                                <input type="range" min="1" max="100" value={configuracion.marcaAguaOpacity ?? 5} onChange={(e) => actualizarConfiguracion('marcaAguaOpacity', Number(e.target.value))} className="w-full accent-blue-600" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+
+                      {configuracion.marcaAguaUrl && (
+                        <div className="mt-8 pt-8 border-t border-slate-200">
+                          <h4 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4">¿En dónde mostrar la Marca de Agua?</h4>
+                          <div className="flex items-center gap-6 mb-6">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                              <input 
+                                type="radio" 
+                                name="modoMarcaAgua" 
+                                checked={configuracion.modoMarcaAgua === 'todas'} 
+                                onChange={() => actualizarConfiguracion('modoMarcaAgua', 'todas')}
+                                className="w-4 h-4 text-blue-600"
+                              /> En todas las páginas
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                              <input 
+                                type="radio" 
+                                name="modoMarcaAgua" 
+                                checked={configuracion.modoMarcaAgua === 'seleccionadas'} 
+                                onChange={() => actualizarConfiguracion('modoMarcaAgua', 'seleccionadas')}
+                                className="w-4 h-4 text-blue-600"
+                              /> Elegir páginas específicas
+                            </label>
+                          </div>
+
+                          {configuracion.modoMarcaAgua === 'seleccionadas' && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-xl border border-slate-200">
+                              {paginas.map((p, idx) => (
+                                <label key={p.id} className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer bg-white p-3 rounded-lg border border-slate-200 hover:border-blue-400">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={(configuracion.paginasMarcaAgua || []).includes(p.id)}
+                                    onChange={(e) => {
+                                      let arr = [...(configuracion.paginasMarcaAgua || [])];
+                                      if (e.target.checked) arr.push(p.id);
+                                      else arr = arr.filter(id => id !== p.id);
+                                      actualizarConfiguracion('paginasMarcaAgua', arr);
+                                    }}
+                                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                                  />
+                                  {p.titulo || `Página ${idx + 1}`}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200">
+                    <div className="bg-slate-50 border-b border-slate-200 p-6 flex items-center gap-3 rounded-t-3xl">
+                      <Type className="text-blue-600" />
+                      <h3 className="text-lg font-black text-slate-800">3. Cabecera y Pie de Página Globales (Opcional)</h3>
+                    </div>
+                    <div className="p-8 space-y-8">
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!configuracion.mostrarCabeceraGlobal}
+                            onChange={(e) => actualizarConfiguracion('mostrarCabeceraGlobal', e.target.checked)}
+                            className="w-4 h-4 rounded text-blue-600"
+                          />
+                          Habilitar Cabecera Global en todas las páginas de contenido
+                        </label>
+                        {configuracion.mostrarCabeceraGlobal && (
+                          <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-24">
+                            <ReactQuill
+                              theme="snow"
+                              modules={quillModules}
+                              value={configuracion.cabeceraGlobalHtml || ''}
+                              onChange={(val) => actualizarConfiguracion('cabeceraGlobalHtml', val)}
+                            />
                           </div>
                         )}
+                      </div>
 
-                        {/* BLOQUE ESPECIAL DE FIRMAS (SOPORTA 1 O MÚLTIPLES FIRMAS EN PARALELO) */}
-                        {bloque.tipo === 'firma' && (
-                          <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Disposición de Firmas:</span>
+                      <div className="space-y-3 pt-4 border-t border-slate-100">
+                        <label className="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!configuracion.mostrarPiePaginaGlobal}
+                            onChange={(e) => actualizarConfiguracion('mostrarPiePaginaGlobal', e.target.checked)}
+                            className="w-4 h-4 rounded text-blue-600"
+                          />
+                          Habilitar Pie de Página Global en todas las páginas de contenido
+                        </label>
+                        {configuracion.mostrarPiePaginaGlobal && (
+                          <div className="bg-white border-2 border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:border-b [&_.ql-toolbar]:border-slate-200 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-24">
+                            <ReactQuill
+                              theme="snow"
+                              modules={quillModules}
+                              value={configuracion.piePaginaGlobalHtml || ''}
+                              onChange={(val) => actualizarConfiguracion('piePaginaGlobalHtml', val)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-16 pt-10 border-t-2 border-red-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-red-50/50 p-8 rounded-3xl">
+                    <div>
+                      <h4 className="text-lg font-black text-red-700 flex items-center gap-2"><AlertCircle size={20} /> Zona de Eliminación</h4>
+                    </div>
+                    <button type="button" onClick={intentarEliminarEdicion} disabled={eliminando} className="shrink-0 flex items-center justify-center space-x-2 px-6 py-3.5 bg-white border-2 border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer">
+                      <Trash2 size={18} /> <span>{eliminando ? 'Eliminando...' : 'Eliminar Edición'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {pestañaActiva === 'contenido' && paginaActiva && (
+                <div className="animate-in fade-in duration-500">
+                  
+                  {/* BARRA SUPERIOR DE NAVEGACIÓN DE PÁGINAS CON SALTO DIRECTO, DUPLICACIÓN Y EXPORTACIÓN */}
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-3 justify-between items-center mb-8 sticky top-4 z-40">
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-center md:justify-start">
+                      <button onClick={() => cambiarPagina(Math.max(0, indicePaginaActual - 1))} disabled={indicePaginaActual === 0} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 text-slate-600 cursor-pointer"><ChevronLeft size={20} /></button>
+                      
+                      <select
+                        value={indicePaginaActual}
+                        onChange={(e) => cambiarPagina(Number(e.target.value))}
+                        className="font-bold text-slate-700 px-3 border-2 border-slate-200 hover:border-blue-400 py-2 rounded-lg text-sm bg-white outline-none max-w-60 truncate cursor-pointer"
+                        title="Saltar directamente a cualquier hoja"
+                      >
+                        {paginas.map((p, idx) => (
+                          <option key={p.id} value={idx}>
+                            Hoja {idx + 1} de {paginas.length} — {p.titulo || p.subtitulo || 'Sin título'}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1.5 rounded-lg" title="Escribe el número de hoja y presiona Enter">
+                        <span className="text-[10px] font-black text-slate-400 uppercase">Ir a:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={paginas.length}
+                          placeholder={`${indicePaginaActual + 1}`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const val = Number((e.target as HTMLInputElement).value);
+                              if (val >= 1 && val <= paginas.length) {
+                                cambiarPagina(val - 1);
+                                (e.target as HTMLInputElement).value = '';
+                              }
+                            }
+                          }}
+                          className="w-12 text-xs font-black text-blue-700 text-center bg-white border border-slate-200 rounded py-0.5 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <button onClick={() => cambiarPagina(Math.min(paginas.length - 1, indicePaginaActual + 1))} disabled={indicePaginaActual === paginas.length - 1} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 text-slate-600 cursor-pointer"><ChevronRight size={20} /></button>
+                      
+                      <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block"></div>
+                      
+                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-lg">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase px-2 hidden lg:inline">Orden:</span>
+                        <button onClick={() => moverPagina('izq')} disabled={indicePaginaActual === 0} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Mover página a la izquierda"><MoveLeft size={14} /></button>
+                        <button onClick={() => moverPagina('der')} disabled={indicePaginaActual === paginas.length - 1} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Mover página a la derecha"><MoveRight size={14} /></button>
+                      </div>
+
+                      <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                      <button onClick={agregarPagina} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"><Plus size={15} /> Nueva Pág</button>
+                      <button onClick={duplicarPaginaActual} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer" title="Duplicar esta página completa con sus bloques"><Copy size={15} /> Duplicar Pág</button>
+                      <button 
+                        onClick={() => setModalImportarJsonAbierto(true)} 
+                        className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        title="Inyectar lote de páginas, tablas y gráficas desde JSON"
+                      >
+                        <Database size={14} /> Importar JSON
+                      </button>
+                      <button onClick={intentarEliminarPagina} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"><Trash2 size={15} /> Eliminar</button>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full md:w-auto justify-center">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-3">
+                        {estadoGuardadoVivo === 'guardado' && <><CheckCircle2 size={14} className="text-green-500" /> Guardado</>}
+                        {estadoGuardadoVivo === 'escribiendo' && <><Edit3 size={14} className="text-blue-500" /> Cambios...</>}
+                        {estadoGuardadoVivo === 'guardando' && <><RefreshCcw size={14} className="text-yellow-500 animate-spin" /> Nube</>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CABECERA CONFIGURABLE DE LA PÁGINA */}
+                  <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                      <div className="w-full space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Título de la Página (Déjalo en blanco para ocultarlo)</label>
+                          <input
+                            type="text"
+                            value={paginaActiva.titulo}
+                            onChange={(e) => actualizarTituloPagina(e.target.value)}
+                            placeholder="Ej: Capítulo 1. Introducción (O deja vacío si es continuación)"
+                            className="text-3xl font-black tracking-tight text-slate-900 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full placeholder:text-slate-300 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Subtítulo de la Página (Opcional)</label>
+                          <input
+                            type="text"
+                            value={paginaActiva.subtitulo || ''}
+                            onChange={(e) => actualizarCampoPagina('subtitulo', e.target.value)}
+                            placeholder="Escribe un subtítulo o descripción secundaria para esta hoja..."
+                            className="text-lg font-medium text-slate-600 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full placeholder:text-slate-300 transition-colors"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="shrink-0 flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <input 
+                          type="color" 
+                          value={paginaActiva.colorFondo || '#fdfbf7'} 
+                          onChange={(e) => actualizarColorFondoPagina(e.target.value)} 
+                          className="w-10 h-10 cursor-pointer rounded-lg border-2"
+                          title="Color de fondo de la página"
+                        />
+                        <div>
+                          <span className="block text-sm font-bold text-slate-800">Fondo de Página</span>
+                          <span className="block text-xs text-slate-500">{paginaActiva.colorFondo || '#fdfbf7'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-6 items-center">
+                      <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700 cursor-pointer bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={paginaActiva.mostrarNumero !== false}
+                          onChange={(e) => actualizarCampoPagina('mostrarNumero', e.target.checked)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        Mostrar número de índice en el encabezado (Ej: &quot;1.&quot;, &quot;2.&quot;)
+                      </label>
+
+                      <label className="flex items-center gap-2.5 text-sm font-bold text-slate-700 cursor-pointer bg-amber-50/70 px-4 py-2.5 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={paginaActiva.posicion === 'antes_portada'}
+                          onChange={(e) => actualizarCampoPagina('posicion', e.target.checked ? 'antes_portada' : 'despues_portada')}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                        />
+                        Ubicar esta hoja ANTES de la Portada Principal (Pre-Portada)
+                      </label>
+                    </div>
+
+                    <details className="pt-3 border-t border-slate-100 group">
+                      <summary className="text-xs font-bold uppercase tracking-widest text-blue-600 cursor-pointer select-none flex items-center gap-2">
+                        <span>+ Configurar Cabecera y Pie de Página exclusivos para esta hoja</span>
+                      </summary>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Cabecera de esta Página</label>
+                          <div className="bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-20">
+                            <ReactQuill
+                              theme="snow"
+                              modules={quillModules}
+                              value={paginaActiva.cabeceraHtml || ''}
+                              onChange={(val) => actualizarCampoPagina('cabeceraHtml', val)}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Pie de Página de esta Hoja</label>
+                          <div className="bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-20">
+                            <ReactQuill
+                              theme="snow"
+                              modules={quillModules}
+                              value={paginaActiva.piePaginaHtml || ''}
+                              onChange={(val) => actualizarCampoPagina('piePaginaHtml', val)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                  <div className="space-y-6">
+                    {paginaActiva.bloques.length === 0 && (
+                      <div className="border-4 border-dashed border-slate-200 rounded-3xl p-20 flex flex-col items-center justify-center text-slate-400 bg-white/50">
+                        <Layout size={48} className="mb-4 text-slate-300" />
+                        <h3 className="text-xl font-bold text-slate-600 mb-2">Esta página está vacía</h3>
+                        <p className="mb-6">Agrega un bloque estructural para comenzar a construirla.</p>
+                      </div>
+                    )}
+
+                    {paginaActiva.bloques.map((bloque, bIdx) => (
+                      <div key={bloque.id} className={`bg-white rounded-2xl shadow-sm border group ${bloque.tipo === 'tabla' && bloque.oculto ? 'border-amber-300 opacity-90' : 'border-slate-200'}`}>
+                        
+                        <div className={`px-4 py-3 flex flex-wrap gap-2 justify-between items-center border-b rounded-t-2xl ${bloque.tipo === 'tabla' && bloque.oculto ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex items-center gap-3 text-slate-400">
+                            <GripVertical size={16} className="cursor-grab active:cursor-grabbing hover:text-slate-600 hidden md:block" />
+                            <span className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${bloque.tipo === 'tabla' && bloque.oculto ? 'text-amber-700' : 'text-slate-500'}`}>
+                              {getBloqueIcon(bloque)}
+                              Bloque de {bloque.tipo} {bloque.tipo === 'tabla' && bloque.oculto && '(Oculto al público)'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {bloque.tipo === 'texto' && (
+                              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+                                <Columns size={13} className="text-blue-600" />
+                                <span className="text-[10px] font-black text-slate-500 uppercase">Diseño:</span>
                                 <select
-                                  value={bloque.alineacion || 'espaciado'}
-                                  onChange={(e) => actualizarAlineacionBloqueFirma(bloque.id, e.target.value as BloqueFirma['alineacion'])}
-                                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                                  value={bloque.columnas || 1}
+                                  onChange={(e) => actualizarCampoBloqueTexto(bloque.id, 'columnas', Number(e.target.value) as 1 | 2 | 3)}
+                                  className="text-xs font-bold text-blue-700 bg-transparent outline-none cursor-pointer"
                                 >
-                                  <option value="izquierda">Alineadas a la Izquierda</option>
-                                  <option value="centro">Centradas</option>
-                                  <option value="derecha">Alineadas a la Derecha</option>
-                                  <option value="espaciado">Distribuidas Simétricamente (Lado a Lado)</option>
+                                  <option value={1}>1 Columna (Ancho completo)</option>
+                                  <option value={2}>2 Columnas Paralelas (Lado a Lado)</option>
+                                  <option value={3}>3 Columnas Paralelas</option>
                                 </select>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => agregarSegundaFirmaAlBloque(bloque.id)}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                              >
-                                <Plus size={14} /> Agregar otra firma al lado
-                              </button>
+                            )}
+
+                            {bloque.tipo === 'tabla' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => clonarTablaExistente(bloque)}
+                                  className="flex items-center gap-1.5 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-bold transition-colors shadow-xs cursor-pointer"
+                                  title="Duplicar esta tabla en esta misma página"
+                                >
+                                  <Copy size={12} /> Clonar
+                                </button>
+                                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs" title="Reducir o ampliar el espacio vertical entre todas las filas (0px = ultra compacto)">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase">Espacio Filas:</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="24"
+                                    step="1"
+                                    value={bloque.paddingFila ?? 6}
+                                    onChange={(e) => actualizarPropiedadTabla(bloque.id, 'paddingFila', Number(e.target.value))}
+                                    className="w-16 accent-emerald-600 cursor-pointer"
+                                  />
+                                  <span className="text-[11px] font-black text-emerald-700 min-w-7 text-right">{bloque.paddingFila ?? 6}px</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs" title="Tamaño de letra de la tabla">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase">Letra:</span>
+                                  <input
+                                    type="number"
+                                    min="8"
+                                    max="28"
+                                    value={bloque.tamanoTextoTabla ?? 14}
+                                    onChange={(e) => actualizarPropiedadTabla(bloque.id, 'tamanoTextoTabla', Number(e.target.value))}
+                                    className="w-11 text-xs font-bold text-slate-700 outline-none text-center"
+                                  />
+                                  <span className="text-[10px] text-slate-400">px</span>
+                                </div>
+                              </>
+                            )}
+
+                            {(bloque.tipo === 'tabla' || bloque.tipo === 'grafica') && (
+                              <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-xs">
+                                <span className="text-[10px] font-black text-slate-500 uppercase">Tamaño:</span>
+                                <input
+                                  type="range"
+                                  min="30"
+                                  max="200"
+                                  step="5"
+                                  value={bloque.escala || 100}
+                                  onChange={(e) => actualizarEscalaBloque(bloque.id, Number(e.target.value))}
+                                  className="w-20 accent-blue-600 cursor-pointer"
+                                />
+                                <span className="text-xs font-black text-blue-600 min-w-10 text-right">{bloque.escala || 100}%</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-1 bg-slate-200/50 p-1 rounded-lg">
+                              <button onClick={() => moverBloque(bIdx, 'arriba')} disabled={bIdx === 0} className="p-1 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Subir bloque"><ArrowUp size={14} /></button>
+                              <button onClick={() => moverBloque(bIdx, 'abajo')} disabled={bIdx === paginaActiva.bloques.length - 1} className="p-1 hover:bg-white rounded text-slate-500 hover:text-blue-600 disabled:opacity-30 transition-colors shadow-sm cursor-pointer" title="Bajar bloque"><ArrowDown size={14} /></button>
                             </div>
 
-                            <div className={`grid grid-cols-1 ${bloque.firmas.length > 1 ? 'md:grid-cols-2' : ''} gap-6`}>
-                              {bloque.firmas.map((fItem, fIdx) => {
-                                const keyLoader = `${bloque.id}_firma_${fIdx}`;
-                                return (
-                                  <div key={fItem.id || fIdx} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 relative">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs font-black uppercase tracking-widest text-amber-700">Firma #{fIdx + 1}</span>
-                                      {bloque.firmas.length > 1 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => eliminarFirmaDelBloque(bloque.id, fIdx)}
-                                          className="text-red-500 hover:bg-red-50 p-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                                        >
-                                          <Trash2 size={13} /> Quitar
-                                        </button>
-                                      )}
-                                    </div>
+                            <div className="w-px h-4 bg-slate-300"></div>
 
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                      <div className="relative flex-1">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400" title="Cambiar color de fondo general del bloque">
+                              <Palette size={14} />
+                              <input 
+                                type="color" 
+                                value={bloque.colorFondo || '#ffffff'} 
+                                onChange={(e) => actualizarColorFondoBloque(bloque.id, e.target.value)} 
+                                className="w-5 h-5 rounded cursor-pointer border-none p-0"
+                              />
+                            </div>
+                            
+                            <div className="w-px h-4 bg-slate-300"></div>
+                            <button onClick={() => intentarEliminarBloque(bloque.id, bloque.tipo)} className="text-red-400 hover:text-red-600 transition-colors p-1 cursor-pointer"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+
+                        <div className="p-0">
+                          {bloque.tipo === 'texto' && (() => {
+                            const colsActivas: (1 | 2 | 3)[] = bloque.columnas === 3 ? [1, 2, 3] : bloque.columnas === 2 ? [1, 2] : [1];
+                            const todasImgsEnBloque = colsActivas.flatMap(colNum => {
+                              const htmlCol = colNum === 2 ? bloque.contenidoCol2 : colNum === 3 ? bloque.contenidoCol3 : bloque.contenido;
+                              return extraerImagenesDeColumnaTexto(htmlCol).map(imgObj => ({ ...imgObj, colNum }));
+                            });
+
+                            return (
+                              <div>
+                                {/* BARRA FLOTANTE AUTOMÁTICA CUANDO EL USUARIO SOMBREA TEXTO EN EL EDITOR */}
+                                {seleccionTextoActiva && seleccionTextoActiva.bloqueId === bloque.id && (
+                                  <div className="bg-slate-900 text-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 animate-in fade-in duration-200">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="px-2 py-0.5 bg-blue-600 text-[10px] font-black uppercase rounded">Texto Seleccionado</span>
+                                      <span className="text-xs font-bold text-blue-200 truncate max-w-xs">&ldquo;{seleccionTextoActiva.texto}&rdquo;</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                      <select id={`float-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-800 text-white border border-slate-700 rounded-lg outline-none max-w-52">
+                                        <option value="">-- Elegir Página del Libro --</option>
+                                        {paginas.map((p, idx) => (
+                                          <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
+                                        ))}
+                                      </select>
+                                      <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700" title="Color del texto enlazado">
+                                        <span className="text-[10px] font-bold text-slate-300">Color:</span>
+                                        <input type="color" id={`float-color-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
+                                      </div>
+                                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">
+                                        <input type="checkbox" id={`float-under-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-500" />
+                                        Subrayado
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const pagId = (document.getElementById(`float-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
+                                          const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                          const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          if (!pagId) {
+                                            mostrarMensaje('Elige primero la página del libro en la lista desplegable.', 'error');
+                                            return;
+                                          }
+                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'pagina', pagId, colHex, sub);
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
+                                      >
+                                        Enlazar a Página
+                                      </button>
+                                      <input
+                                        type="text"
+                                        id={`float-url-${bloque.id}`}
+                                        placeholder="O pega URL..."
+                                        className="px-2.5 py-1.5 text-xs bg-slate-800 text-white border border-slate-700 rounded-lg outline-none w-32"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const urlEx = (document.getElementById(`float-url-${bloque.id}`) as HTMLInputElement)?.value || '';
+                                          const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                          const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          if (!urlEx.trim()) {
+                                            mostrarMensaje('Escribe la URL externa.', 'error');
+                                            return;
+                                          }
+                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'url', urlEx, colHex, sub);
+                                        }}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
+                                      >
+                                        Enlazar URL
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSeleccionTextoActiva(null)}
+                                        className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                                        title="Cerrar barra de selección"
+                                      >
+                                        <X size={15} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* EDITORES DE TEXTO EN 1, 2 O 3 COLUMNAS INDEPENDIENTES LADO A LADO */}
+                                <div 
+                                  className={`grid grid-cols-1 ${bloque.columnas === 2 ? 'md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200' : bloque.columnas === 3 ? 'md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200' : ''}`}
+                                  style={{ backgroundColor: bloque.colorFondo || 'transparent' }}
+                                >
+                                  <div 
+                                    className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
+                                    onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 1, e)}
+                                    onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 1, e)}
+                                  >
+                                    {(bloque.columnas === 2 || bloque.columnas === 3) && (
+                                      <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
+                                        Columna 1 (Izquierda)
+                                      </div>
+                                    )}
+                                    <ReactQuill theme="snow" modules={quillModules} value={bloque.contenido} onChange={(val) => actualizarBloqueTexto(bloque.id, val)} />
+                                  </div>
+
+                                  {(bloque.columnas === 2 || bloque.columnas === 3) && (
+                                    <div 
+                                      className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
+                                      onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 2, e)}
+                                      onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 2, e)}
+                                    >
+                                      <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
+                                        Columna 2 ({bloque.columnas === 2 ? 'Derecha' : 'Centro'})
+                                      </div>
+                                      <ReactQuill theme="snow" modules={quillModules} value={bloque.contenidoCol2 || ''} onChange={(val) => actualizarCampoBloqueTexto(bloque.id, 'contenidoCol2', val)} />
+                                    </div>
+                                  )}
+
+                                  {bloque.columnas === 3 && (
+                                    <div 
+                                      className="[&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-container]:border-none [&_.ql-editor]:min-h-37.5 [&_.ql-editor]:text-base"
+                                      onMouseUp={(e) => capturarSeleccionEditor(bloque.id, 3, e)}
+                                      onKeyUp={(e) => capturarSeleccionEditor(bloque.id, 3, e)}
+                                    >
+                                      <div className="bg-slate-100/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
+                                        Columna 3 (Derecha)
+                                      </div>
+                                      <ReactQuill theme="snow" modules={quillModules} value={bloque.contenidoCol3 || ''} onChange={(val) => actualizarCampoBloqueTexto(bloque.id, 'contenidoCol3', val)} />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* BARRA DE HERRAMIENTAS AVANZADA DEL BLOQUE DE TEXTO */}
+                                <div className="bg-slate-50 p-4 border-t border-slate-200 space-y-3 rounded-b-2xl">
+                                  
+                                  {/* 1. ENLAZAR TEXTO SELECCIONADO O LÍNEA DE ÍNDICE */}
+                                  <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                                    <span className="text-[11px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                                      <Link2 size={14} /> Enlazar Texto (Sombréalo arriba):
+                                    </span>
+                                    {(bloque.columnas === 2 || bloque.columnas === 3) && (
+                                      <select id={`link-col-${bloque.id}`} defaultValue="1" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                        <option value="1">Columna 1</option>
+                                        <option value="2">Columna 2</option>
+                                        {bloque.columnas === 3 && <option value="3">Columna 3</option>}
+                                      </select>
+                                    )}
+                                    <input
+                                      type="text"
+                                      id={`link-txt-${bloque.id}`}
+                                      placeholder="Sombrea texto arriba o escríbelo..."
+                                      className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 min-w-48"
+                                    />
+                                    <select id={`link-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-52">
+                                      <option value="">-- Elegir Página Destino --</option>
+                                      {paginas.map((p, idx) => (
+                                        <option key={p.id} value={p.id}>
+                                          Hoja {idx + 1}: {p.titulo || 'Sin título'}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200" title="Elige el color del texto enlazado">
+                                      <span className="text-[10px] font-bold text-slate-500">Color:</span>
+                                      <input
+                                        type="color"
+                                        id={`link-color-${bloque.id}`}
+                                        defaultValue={edicionActiva?.color_principal || '#1d4ed8'}
+                                        className="w-5 h-5 rounded cursor-pointer border-0 p-0"
+                                      />
+                                    </div>
+                                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
+                                      <input
+                                        type="checkbox"
+                                        id={`link-under-${bloque.id}`}
+                                        defaultChecked={true}
+                                        className="w-3.5 h-3.5 rounded text-blue-600"
+                                      />
+                                      Subrayado
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const col = Number((document.getElementById(`link-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
+                                        const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
+                                        const pagId = (document.getElementById(`link-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
+                                        const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                        const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        if (!pagId) {
+                                          mostrarMensaje('Selecciona primero la página del libro a la que deseas redirigir.', 'error');
+                                          return;
+                                        }
+                                        enlazarTextoEnColumna(bloque.id, col, txt, 'pagina', pagId, colHex, sub);
+                                      }}
+                                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs cursor-pointer"
+                                    >
+                                      Enlazar a Página
+                                    </button>
+                                    <span className="text-[10px] font-bold text-slate-400">o URL:</span>
+                                    <input
+                                      type="text"
+                                      id={`link-url-${bloque.id}`}
+                                      placeholder="https://..."
+                                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none w-32"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const col = Number((document.getElementById(`link-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
+                                        const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
+                                        const urlEx = (document.getElementById(`link-url-${bloque.id}`) as HTMLInputElement)?.value || '';
+                                        const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                        const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        if (!urlEx.trim()) {
+                                          mostrarMensaje('Escribe la URL externa.', 'error');
+                                          return;
+                                        }
+                                        enlazarTextoEnColumna(bloque.id, col, txt, 'url', urlEx, colHex, sub);
+                                      }}
+                                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      Enlazar URL
+                                    </button>
+                                  </div>
+
+                                  {/* 2. INSERTAR Y GESTIONAR IMÁGENES EN EL TEXTO (EN POSICIÓN DEL CURSOR, BORDES, ALINEACIÓN, MOVER Y BORRAR) */}
+                                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-3">
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                      <span className="text-[11px] font-black text-pink-600 uppercase tracking-wider flex items-center gap-1.5">
+                                        <ImageIcon size={14} /> Insertar Imagen (Haz clic donde quieras en el texto y súbela):
+                                      </span>
+                                      {(bloque.columnas === 2 || bloque.columnas === 3) && (
+                                        <select id={`img-col-${bloque.id}`} defaultValue="1" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                          <option value="1">Columna 1</option>
+                                          <option value="2">Columna 2</option>
+                                          {bloque.columnas === 3 && <option value="3">Columna 3</option>}
+                                        </select>
+                                      )}
+                                      <select id={`img-size-${bloque.id}`} defaultValue="50%" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                        <option value="15%">Ancho: 15% (Icono / Logo)</option>
+                                        <option value="25%">Ancho: 25% (Miniatura)</option>
+                                        <option value="35%">Ancho: 35% (Pequeña)</option>
+                                        <option value="50%">Ancho: 50% (Mediana)</option>
+                                        <option value="75%">Ancho: 75% (Grande)</option>
+                                        <option value="100%">Ancho: 100% (Completa)</option>
+                                      </select>
+                                      <select id={`img-align-${bloque.id}`} defaultValue="centro" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                        <option value="izquierda">Alinear Izquierda</option>
+                                        <option value="centro">Centrada</option>
+                                        <option value="derecha">Alinear Derecha</option>
+                                      </select>
+                                      <select id={`img-border-${bloque.id}`} defaultValue="cuadrado" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                        <option value="cuadrado">Esquinas: Cuadradas (Rectas)</option>
+                                        <option value="redondeado">Esquinas: Redondeadas</option>
+                                        <option value="circular">Esquinas: Circular / Óvalo</option>
+                                      </select>
+                                      <div className="relative inline-block">
                                         <input
                                           type="file"
                                           accept="image/*"
-                                          onChange={(e) => manejarSubidaImagenFirma(e, bloque.id, fIdx)}
+                                          onChange={(e) => {
+                                            const col = Number((document.getElementById(`img-col-${bloque.id}`) as HTMLSelectElement)?.value || 1) as 1 | 2 | 3;
+                                            const sz = (document.getElementById(`img-size-${bloque.id}`) as HTMLSelectElement)?.value || '50%';
+                                            const al = (document.getElementById(`img-align-${bloque.id}`) as HTMLSelectElement)?.value || 'centro';
+                                            const brd = ((document.getElementById(`img-border-${bloque.id}`) as HTMLSelectElement)?.value || 'cuadrado') as 'cuadrado' | 'redondeado' | 'circular';
+                                            manejarSubidaImagenEnTexto(e, bloque.id, col, sz, al, brd);
+                                          }}
                                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                          disabled={subiendoImagen[keyLoader]}
                                         />
-                                        <button type="button" className="w-full px-3 py-2.5 bg-white border border-slate-300 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2">
-                                          {subiendoImagen[keyLoader] ? <RefreshCcw size={14} className="animate-spin" /> : <Upload size={14} />}
-                                          {subiendoImagen[keyLoader] ? 'Subiendo firma...' : 'Subir Imagen de Firma (PNG/JPG)'}
+                                        <button type="button" className="px-3.5 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer">
+                                          <Upload size={12} /> Subir Imagen en Posición del Cursor
                                         </button>
                                       </div>
-                                      <input
-                                        type="text"
-                                        value={fItem.url || ''}
-                                        onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'url', e.target.value)}
-                                        placeholder="O pegar URL de la firma..."
-                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
-                                      />
                                     </div>
 
-                                    <div>
-                                      <label className="flex justify-between text-[11px] font-bold text-slate-500 uppercase mb-1">
-                                        <span>Altura de la rúbrica / firma</span>
-                                        <span className="text-blue-600">{fItem.tamanoFirma ?? 72}px</span>
-                                      </label>
-                                      <input
-                                        type="range"
-                                        min="35"
-                                        max="180"
-                                        value={fItem.tamanoFirma ?? 72}
-                                        onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'tamanoFirma', Number(e.target.value))}
-                                        className="w-full accent-blue-600 cursor-pointer"
-                                      />
-                                    </div>
+                                    {/* GESTOR INDIVIDUAL DE IMÁGENES YA INSERTADAS EN ESTE BLOQUE DE TEXTO */}
+                                    {todasImgsEnBloque.length > 0 && (
+                                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                                        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                          Imágenes dentro de este texto ({todasImgsEnBloque.length}) — Edita posición, alineación, esquinas, tamaño o elimínalas:
+                                        </span>
+                                        <div className="grid grid-cols-1 gap-2">
+                                          {todasImgsEnBloque.map((imgItem, iGlobal) => (
+                                            <div key={`${imgItem.colNum}-${imgItem.indice}-${iGlobal}`} className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                              <div className="flex items-center gap-3 min-w-0">
+                                                <img src={imgItem.src} alt="Miniatura" className="w-11 h-11 object-cover rounded border border-slate-300 bg-white shrink-0" />
+                                                <div className="text-xs">
+                                                  <span className="font-black text-slate-700 block">Imagen #{imgItem.indice + 1} {bloque.columnas && bloque.columnas > 1 ? `(Col ${imgItem.colNum})` : ''}</span>
+                                                  <span className="text-[10px] text-slate-400">Ancho actual: {imgItem.ancho}</span>
+                                                </div>
+                                              </div>
 
-                                    <div className="grid grid-cols-1 gap-3">
-                                      <input
-                                        type="text"
-                                        value={fItem.nombre}
-                                        onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'nombre', e.target.value)}
-                                        placeholder="Nombre completo (Ej: Luis Alberto González Araujo)"
-                                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={fItem.cargo}
-                                        onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'cargo', e.target.value)}
-                                        placeholder="Cargo (Ej: Director ejecutivo ACOFI)"
-                                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500"
-                                      />
-                                      <input
-                                        type="text"
-                                        value={fItem.infoAdicional || ''}
-                                        onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'infoAdicional', e.target.value)}
-                                        placeholder="Línea adicional opcional (Ej: Editor de la publicación)"
-                                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
-                                      />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                              <div className="flex flex-wrap items-center gap-1.5">
+                                                {/* Mover arriba o abajo entre párrafos */}
+                                                <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5" title="Subir o bajar la imagen entre los párrafos del texto">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => moverImagenEntreParrafosTexto(bloque.id, imgItem.colNum, imgItem.indice, 'arriba')}
+                                                    className="px-2 py-1 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded flex items-center gap-0.5 cursor-pointer"
+                                                    title="Subir imagen un párrafo hacia arriba"
+                                                  >
+                                                    <ArrowUp size={12} /> Subir
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => moverImagenEntreParrafosTexto(bloque.id, imgItem.colNum, imgItem.indice, 'abajo')}
+                                                    className="px-2 py-1 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded flex items-center gap-0.5 cursor-pointer"
+                                                    title="Bajar imagen un párrafo hacia abajo"
+                                                  >
+                                                    <ArrowDown size={12} /> Bajar
+                                                  </button>
+                                                </div>
 
-                            {/* VISTA PREVIA DE LAS FIRMAS */}
-                            <div className={`p-6 bg-white rounded-2xl border border-dashed border-slate-300 flex flex-wrap gap-12 items-end ${
-                              bloque.alineacion === 'centro' ? 'justify-center text-center' :
-                              bloque.alineacion === 'derecha' ? 'justify-end text-right' :
-                              bloque.alineacion === 'espaciado' ? 'justify-around text-left' :
-                              'justify-start text-left'
-                            }`}>
-                              {bloque.firmas.map((fItem, i) => (
-                                <div key={i} className="flex flex-col space-y-1 min-w-52">
-                                  {fItem.url ? (
-                                    <img
-                                      src={fItem.url}
-                                      alt={fItem.nombre}
-                                      style={{ height: `${fItem.tamanoFirma ?? 72}px` }}
-                                      className={`w-auto object-contain mb-2 ${bloque.alineacion === 'centro' ? 'mx-auto' : bloque.alineacion === 'derecha' ? 'ml-auto' : 'mr-auto'}`}
-                                    />
-                                  ) : (
-                                    <div className="h-14 w-44 border-b border-slate-300 mb-2 flex items-end pb-1 text-[10px] italic text-slate-400">
-                                      (Espacio para imagen de firma)
-                                    </div>
-                                  )}
-                                  <span className="font-bold text-slate-900 text-base">{fItem.nombre}</span>
-                                  <span className="text-slate-600 text-sm">{fItem.cargo}</span>
-                                  {fItem.infoAdicional && <span className="text-slate-500 text-xs">{fItem.infoAdicional}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                                                {/* Alineación Izquierda / Centro / Derecha */}
+                                                <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { alineacion: 'izquierda' })}
+                                                    className={`p-1.5 rounded cursor-pointer ${imgItem.alineacion === 'izquierda' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                                                    title="Alinear a la izquierda"
+                                                  >
+                                                    <AlignLeft size={13} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { alineacion: 'centro' })}
+                                                    className={`p-1.5 rounded cursor-pointer ${imgItem.alineacion === 'centro' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                                                    title="Centrar imagen"
+                                                  >
+                                                    <AlignCenter size={13} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { alineacion: 'derecha' })}
+                                                    className={`p-1.5 rounded cursor-pointer ${imgItem.alineacion === 'derecha' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                                                    title="Alinear a la derecha"
+                                                  >
+                                                    <AlignRight size={13} />
+                                                  </button>
+                                                </div>
 
-                        {/* CONFIGURADOR DE BLOQUE BOTÓN (CON OPCIÓN DE ELEGIR PÁGINA INTERNA O URL) */}
-                        {bloque.tipo === 'boton' && (
-                          <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Texto del Botón</label>
-                                <input
-                                  type="text"
-                                  value={bloque.texto}
-                                  onChange={(e) => actualizarBloqueBoton(bloque.id, 'texto', e.target.value)}
-                                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500"
-                                  placeholder="Ej: Descargar Informe PDF"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Enlace / URL o Página del Libro</label>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={bloque.url}
-                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'url', e.target.value)}
-                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                    placeholder="https://... o selecciona una hoja"
-                                  />
-                                  <select
-                                    value={bloque.url.startsWith('#pagina:') ? bloque.url.replace('#pagina:', '') : ''}
-                                    onChange={(e) => {
-                                      if (e.target.value) actualizarBloqueBoton(bloque.id, 'url', `#pagina:${e.target.value}`);
-                                    }}
-                                    className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none max-w-44"
-                                  >
-                                    <option value="">O ir a página...</option>
-                                    {paginas.map((p, idx) => (
-                                      <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
+                                                {/* Esquinas Cuadradas vs Redondeadas */}
+                                                <select
+                                                  value={imgItem.borde}
+                                                  onChange={(e) => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { borde: e.target.value as 'cuadrado' | 'redondeado' | 'circular' })}
+                                                  className="px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg outline-none cursor-pointer"
+                                                  title="Cambiar estilo de esquinas de esta imagen"
+                                                >
+                                                  <option value="cuadrado">Recta (Sin bordes redondos)</option>
+                                                  <option value="redondeado">Esquinas Redondeadas</option>
+                                                  <option value="circular">Circular</option>
+                                                </select>
 
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estilo Visual del Botón</label>
-                                <select
-                                  value={bloque.estilo}
-                                  onChange={(e) => actualizarBloqueBoton(bloque.id, 'estilo', e.target.value as EstiloBoton)}
-                                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                >
-                                  <option value="solido">Sólido Clásico (Bordes redondeados)</option>
-                                  <option value="pildora">Ovalado / Píldora Moderna</option>
-                                  <option value="contorno">Contorno Elegante (Transparente)</option>
-                                  <option value="3d">3D con Relieve Físico</option>
-                                  <option value="4d">4D Iluminado (Sombra de Neón Estática)</option>
-                                </select>
-                              </div>
+                                                {/* Tamaño / Ancho en vivo */}
+                                                <select
+                                                  value={['15%', '25%', '35%', '50%', '75%', '100%'].includes(imgItem.ancho) ? imgItem.ancho : '50%'}
+                                                  onChange={(e) => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { ancho: e.target.value })}
+                                                  className="px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded-lg outline-none cursor-pointer"
+                                                  title="Cambiar tamaño de esta imagen"
+                                                >
+                                                  <option value="15%">15%</option>
+                                                  <option value="25%">25%</option>
+                                                  <option value="35%">35%</option>
+                                                  <option value="50%">50%</option>
+                                                  <option value="75%">75%</option>
+                                                  <option value="100%">100%</option>
+                                                </select>
 
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Alineación en la Página</label>
-                                <select
-                                  value={bloque.alineacion}
-                                  onChange={(e) => actualizarBloqueBoton(bloque.id, 'alineacion', e.target.value)}
-                                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                >
-                                  <option value="izquierda">Izquierda</option>
-                                  <option value="centro">Centro</option>
-                                  <option value="derecha">Derecha</option>
-                                </select>
-                              </div>
-
-                              <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200">
-                                <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
-                                  <input
-                                    type="color"
-                                    value={bloque.colorBoton || '#1d4ed8'}
-                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorBoton', e.target.value)}
-                                    className="w-10 h-10 rounded cursor-pointer border"
-                                  />
-                                  <div>
-                                    <span className="block text-xs font-bold text-slate-700">Color Principal</span>
-                                    <span className="text-[10px] text-slate-400">{bloque.colorBoton}</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
-                                  <input
-                                    type="color"
-                                    value={bloque.colorTexto || '#ffffff'}
-                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorTexto', e.target.value)}
-                                    className="w-10 h-10 rounded cursor-pointer border"
-                                  />
-                                  <div>
-                                    <span className="block text-xs font-bold text-slate-700">Color de Texto</span>
-                                    <span className="text-[10px] text-slate-400">{bloque.colorTexto}</span>
-                                  </div>
-                                </div>
-
-                                {bloque.estilo === '4d' && (
-                                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-blue-200">
-                                    <input
-                                      type="color"
-                                      value={bloque.colorIluminacion || '#60a5fa'}
-                                      onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorIluminacion', e.target.value)}
-                                      className="w-10 h-10 rounded cursor-pointer border"
-                                    />
-                                    <div>
-                                      <span className="block text-xs font-bold text-blue-700">Luz 4D (Resplandor)</span>
-                                      <span className="text-[10px] text-slate-400">{bloque.colorIluminacion || '#60a5fa'}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* VISTA PREVIA DEL BOTÓN */}
-                            <div className={`p-6 bg-slate-100/70 rounded-xl border border-dashed border-slate-300 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                              <a
-                                href={bloque.url || '#'}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.preventDefault()}
-                                style={{
-                                  backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
-                                  color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
-                                  borderColor: bloque.colorBoton,
-                                  boxShadow: bloque.estilo === '3d' 
-                                    ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
-                                    : bloque.estilo === '4d'
-                                    ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
-                                    : undefined
-                                }}
-                                className={`px-8 py-4 font-sans font-black text-sm uppercase tracking-wider transition-all inline-block ${
-                                  bloque.estilo === 'pildora' ? 'rounded-full shadow-md' :
-                                  bloque.estilo === 'contorno' ? 'rounded-xl border-2' :
-                                  bloque.estilo === '3d' ? 'rounded-xl -translate-y-1' :
-                                  bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
-                                  'rounded-xl shadow-md'
-                                }`}
-                              >
-                                {bloque.texto || 'Botón'}
-                              </a>
-                            </div>
-                          </div>
-                        )}
-
-                        {bloque.tipo === 'imagen' && (
-                          <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                            <div className="flex flex-col gap-6 mb-6">
-                              <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                                <div className="w-full md:w-1/2">
-                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Opción 1: Subir Archivo Local</label>
-                                  <div className="relative group">
-                                    <input type="file" accept="image/*" onChange={(e) => manejarSubidaImagen(e, bloque.id)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled={subiendoImagen[bloque.id]} />
-                                    <button type="button" className={`w-full px-6 py-4 rounded-xl text-sm font-bold shadow-sm flex justify-center items-center gap-3 transition-colors ${subiendoImagen[bloque.id] ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 group-hover:shadow-md'}`}>
-                                      {subiendoImagen[bloque.id] ? <RefreshCcw size={20} className="animate-spin" /> : <Upload size={20} />}
-                                      {subiendoImagen[bloque.id] ? 'Subiendo archivo a la nube...' : 'Seleccionar Imagen de tu PC'}
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="hidden md:flex flex-col items-center justify-center px-2">
-                                  <div className="h-6 w-px bg-slate-300"></div>
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest my-2">O</span>
-                                  <div className="h-6 w-px bg-slate-300"></div>
-                                </div>
-                                <div className="w-full md:w-1/2">
-                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Opción 2: Enlace Externo (URL)</label>
-                                  <input type="text" value={bloque.url} onChange={(e) => { const nuevasPaginas = [...paginas]; const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueImagen; if (b) { b.url = e.target.value; autoGuardar(nuevasPaginas); } }} className="w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors" placeholder="https://ejemplo.com/foto.jpg" />
-                                </div>
-                              </div>
-
-                              <label className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer p-3 hover:bg-slate-50 rounded-xl bg-white border border-slate-200 w-fit shadow-sm">
-                                <input type="checkbox" checked={bloque.pantallaCompleta} onChange={(e) => { const nuevasPaginas = [...paginas]; const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueImagen; if (b) { b.pantallaCompleta = e.target.checked; autoGuardar(nuevasPaginas); } }} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                                <span className="font-bold">Imagen de Sangrado Completo (Full Bleed)</span>
-                              </label>
-                            </div>
-
-                            {bloque.url && (
-                              <div className="mt-6 rounded-2xl overflow-hidden border-4 border-slate-100 bg-slate-50 flex justify-center items-center shadow-inner relative">
-                                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-xs font-bold uppercase tracking-widest text-slate-600">Vista Previa</div>
-                                <img src={bloque.url} alt="Vista previa" className="w-full h-auto object-contain max-h-100" />
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* TABLA CON VISTA PREVIA ULTRA COMPACTA REAL Y PIE DE TABLA INTEGRADO */}
-                        {bloque.tipo === 'tabla' && (
-                          <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                              <input 
-                                type="text" 
-                                value={bloque.nombre} 
-                                onChange={(e) => {
-                                  const nuevasPaginas = [...paginas];
-                                  const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueTabla;
-                                  if (b) { b.nombre = e.target.value; autoGuardar(nuevasPaginas); }
-                                }}
-                                className="text-lg font-bold text-slate-800 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full md:w-2/3"
-                                placeholder="Título de la tabla (Ej. Datos Ing. Civil)"
-                              />
-                              
-                              <button 
-                                onClick={() => alternarVisibilidadTabla(bloque.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${bloque.oculto ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                              >
-                                {bloque.oculto ? <EyeOff size={16} /> : <Eye size={16} />}
-                                {bloque.oculto ? 'Tabla Oculta' : 'Tabla Visible'}
-                              </button>
-                            </div>
-                            
-                            <div 
-                              className="overflow-x-auto border border-slate-200 rounded-xl mx-auto transition-all"
-                              style={{ 
-                                backgroundColor: bloque.colorFondo || '#ffffff',
-                                width: `${Math.min(100, bloque.escala || 100)}%`,
-                                zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
-                              }}
-                            >
-                              <table 
-                                className="w-full text-left border-collapse" 
-                                style={{ 
-                                  backgroundColor: bloque.colorFondo || '#ffffff',
-                                  fontSize: `${bloque.tamanoTextoTabla ?? 14}px`
-                                }}
-                              >
-                                <thead>
-                                  <tr className="bg-slate-100/80 border-b border-slate-200">
-                                    {bloque.data[0]?.map((_, cIndex) => {
-                                      const anchoCol = bloque.anchosColumnas?.[cIndex];
-                                      return (
-                                        <th 
-                                          key={cIndex} 
-                                          className="p-1 text-center border-r border-slate-200 last:border-r-0"
-                                          style={anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : undefined}
-                                        >
-                                          <div className="flex flex-col items-center gap-1">
-                                            <div className="flex items-center justify-center gap-0.5 flex-nowrap whitespace-nowrap">
-                                              <button
-                                                type="button"
-                                                onClick={() => moverColumnaTabla(bloque.id, cIndex, 'izq')}
-                                                disabled={cIndex === 0}
-                                                className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
-                                                title="Mover columna a la izquierda"
-                                              >
-                                                <MoveLeft size={11} />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => moverColumnaTabla(bloque.id, cIndex, 'der')}
-                                                disabled={cIndex === (bloque.data[0]?.length || 1) - 1}
-                                                className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
-                                                title="Mover columna a la derecha"
-                                              >
-                                                <MoveRight size={11} />
-                                              </button>
-                                              <input
-                                                type="color"
-                                                value={bloque.coloresColumnas?.[cIndex] || bloque.colorFondo || '#ffffff'}
-                                                onChange={(e) => actualizarColorColumnaTabla(bloque.id, cIndex, e.target.value)}
-                                                className="w-4 h-4 rounded cursor-pointer border-0 p-0 shrink-0"
-                                                title="Color de esta columna"
-                                              />
-                                              <button
-                                                type="button"
-                                                onClick={() => insertarColumnaEnPosicion(bloque.id, cIndex)}
-                                                className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded cursor-pointer"
-                                                title="Insertar columna a la derecha de esta"
-                                              >
-                                                +Col
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => eliminarColumnaTabla(bloque.id, cIndex)}
-                                                className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-1 py-0.5 rounded inline-flex items-center cursor-pointer"
-                                                title="Eliminar esta columna"
-                                              >
-                                                <X size={11} />
-                                              </button>
-                                            </div>
-                                            {/* CONTROL DE ANCHO INDIVIDUAL POR COLUMNA */}
-                                            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] text-slate-500">
-                                              <span>Ancho:</span>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max="800"
-                                                placeholder="Auto"
-                                                value={bloque.anchosColumnas?.[cIndex] || ''}
-                                                onChange={(e) => actualizarAnchoColumnaTabla(bloque.id, cIndex, Number(e.target.value))}
-                                                className="w-11 text-center font-bold text-slate-700 outline-none bg-transparent"
-                                                title="Ancho en píxeles para esta columna (0 o vacío = Automático)"
-                                              />
-                                              <span>px</span>
-                                            </div>
-                                          </div>
-                                        </th>
-                                      );
-                                    })}
-                                    <th className="w-44 bg-slate-100/80 text-center text-[10px] font-bold uppercase text-slate-400 px-2">Filas / Alto</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200/60">
-                                  {bloque.data.map((fila, fIndex) => {
-                                    const colorFila = bloque.coloresFilas?.[fIndex];
-                                    const padGeneral = bloque.paddingFila ?? 6;
-                                    const altoIndividual = bloque.altosFilas?.[fIndex];
-                                    const padVertical = altoIndividual !== undefined && altoIndividual > 0
-                                      ? Math.max(0, Math.round((altoIndividual - (bloque.tamanoTextoTabla ?? 14)) / 2))
-                                      : padGeneral;
-                                    const fontSizeCelda = fIndex === 0
-                                      ? Math.max(9, (bloque.tamanoTextoTabla ?? 14) - 1)
-                                      : (bloque.tamanoTextoTabla ?? 14);
-                                    const alturaExactaInput = altoIndividual !== undefined && altoIndividual > 0
-                                      ? altoIndividual
-                                      : Math.max(16, Math.round(fontSizeCelda * 1.15) + padVertical * 2);
-
-                                    return (
-                                      <tr 
-                                        key={fIndex} 
-                                        className={fIndex === 0 ? "font-bold" : ""}
-                                        style={{ 
-                                          backgroundColor: colorFila || bloque.colorFondo || '#ffffff',
-                                          height: `${alturaExactaInput}px`
-                                        }}
-                                      >
-                                        {fila.map((celda, cIndex) => {
-                                          const colorCol = bloque.coloresColumnas?.[cIndex];
-                                          const bgCelda = colorFila || colorCol || bloque.colorFondo || '#ffffff';
-                                          const anchoCol = bloque.anchosColumnas?.[cIndex];
-                                          return (
-                                            <td 
-                                              key={cIndex} 
-                                              className="border-r border-slate-200/60 p-0 last:border-r-0 align-middle"
-                                              style={{ 
-                                                backgroundColor: bgCelda,
-                                                height: `${alturaExactaInput}px`,
-                                                ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
-                                              }}
-                                            >
-                                              <input 
-                                                type="text" 
-                                                value={celda} 
-                                                onChange={(e) => actualizarCeldaTabla(bloque.id, fIndex, cIndex, e.target.value)}
-                                                style={{ 
-                                                  backgroundColor: 'transparent',
-                                                  fontSize: `${fontSizeCelda}px`,
-                                                  lineHeight: 1.1,
-                                                  height: `${alturaExactaInput}px`,
-                                                  minHeight: '0px',
-                                                  paddingTop: `${padVertical}px`,
-                                                  paddingBottom: `${padVertical}px`,
-                                                  paddingLeft: '14px',
-                                                  paddingRight: '14px',
-                                                  boxSizing: 'border-box'
-                                                }}
-                                                className={`w-full block m-0 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-all ${fIndex === 0 ? 'font-bold uppercase tracking-wider text-slate-800' : (cIndex === 0 ? 'font-semibold text-slate-800' : 'text-slate-700')}`}
-                                              />
-                                            </td>
-                                          );
-                                        })}
-                                        <td 
-                                          className="py-0 px-1.5 text-center w-44 bg-slate-50/90 border-l border-slate-200 align-middle"
-                                          style={{ height: `${alturaExactaInput}px` }}
-                                        >
-                                          <div className="flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap leading-none">
-                                            <button
-                                              type="button"
-                                              onClick={() => moverFilaTabla(bloque.id, fIndex, 'arriba')}
-                                              disabled={fIndex === 0}
-                                              className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
-                                              title="Subir fila"
-                                            >
-                                              <ArrowUp size={11} />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => moverFilaTabla(bloque.id, fIndex, 'abajo')}
-                                              disabled={fIndex === bloque.data.length - 1}
-                                              className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
-                                              title="Bajar fila"
-                                            >
-                                              <ArrowDown size={11} />
-                                            </button>
-                                            <input
-                                              type="color"
-                                              value={bloque.coloresFilas?.[fIndex] || bloque.colorFondo || '#ffffff'}
-                                              onChange={(e) => actualizarColorFilaTabla(bloque.id, fIndex, e.target.value)}
-                                              className="w-3.5 h-3.5 rounded cursor-pointer border-0 p-0 shrink-0"
-                                              title="Color de esta fila"
-                                            />
-                                            <input
-                                              type="number"
-                                              min="0"
-                                              max="150"
-                                              placeholder={`${alturaExactaInput}`}
-                                              value={bloque.altosFilas?.[fIndex] || ''}
-                                              onChange={(e) => actualizarAltoFilaTabla(bloque.id, fIndex, Number(e.target.value))}
-                                              className="w-9 h-4 text-[10px] font-bold text-center bg-white border border-slate-200 rounded p-0 outline-none leading-none"
-                                              title="Alto individual de esta fila en px (vacío = usa el espacio general)"
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={() => insertarFilaEnPosicion(bloque.id, fIndex)}
-                                              className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-1 py-0 rounded leading-none cursor-pointer"
-                                              title="Insertar fila debajo de esta"
-                                            >
-                                              +F
-                                            </button>
-                                            {fIndex > 0 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => eliminarFilaTabla(bloque.id, fIndex)}
-                                                className="p-0.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                                title="Eliminar esta fila"
-                                              >
-                                                <Trash2 size={11} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                            <div className="flex gap-2 mt-4">
-                              <button onClick={() => agregarFilaTabla(bloque.id)} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"><Plus size={14} /> Fila al Final</button>
-                              <button onClick={() => agregarColumnaTabla(bloque.id)} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"><Plus size={14} /> Columna al Final</button>
-                            </div>
-
-                            {/* PIE / NOTA / FUENTE PEGADO JUSTO DEBAJO DE LA TABLA */}
-                            <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
-                              <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
-                                <Type size={14} className="text-blue-600" />
-                                <span>+ Agregar texto / fuente / nota justo debajo de esta tabla (sin espacio de bloque)</span>
-                              </summary>
-                              <div className="mt-3 bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-16 [&_.ql-editor]:text-sm">
-                                <ReactQuill
-                                  theme="snow"
-                                  modules={quillModules}
-                                  value={bloque.pieBloque || ''}
-                                  onChange={(val) => actualizarPropiedadTabla(bloque.id, 'pieBloque', val)}
-                                  placeholder="Ej: Fuente: Elaboración propia ACOFI 2025..."
-                                />
-                              </div>
-                            </details>
-                          </div>
-                        )}
-
-                        {bloque.tipo === 'grafica' && (
-                          <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                            <input 
-                              type="text" 
-                              value={bloque.nombre} 
-                              onChange={(e) => actualizarGrafica(bloque.id, 'nombre', e.target.value)}
-                              className="text-lg font-bold text-slate-800 mb-6 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full"
-                              placeholder="Título de la gráfica o mapa"
-                            />
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-xl border border-slate-200">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Fuente de Datos</label>
-                                <select 
-                                  value={bloque.tablaRef} 
-                                  onChange={(e) => actualizarGrafica(bloque.id, 'tablaRef', e.target.value)}
-                                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                >
-                                  <option value="">-- Seleccionar Tabla --</option>
-                                  {todasLasTablasAdmin.map(t => (
-                                    <option key={t.id} value={t.id}>{t.nombre || 'Tabla sin nombre'} ({t.nombrePagina}) {t.oculto ? '👁️‍🗨️' : ''}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Tipo de Visualización Premium</label>
-                                <select 
-                                  value={bloque.tipoGrafica} 
-                                  onChange={(e) => actualizarGrafica(bloque.id, 'tipoGrafica', e.target.value as TipoGrafica)}
-                                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                >
-                                  <optgroup label="Gráficas Circulares 3D y Rellenas (Sin Hueco / Con Hueco)">
-                                    <option value="torta_3d_rellena">Torta 3D Rellena 100% (Sin hueco en el centro)</option>
-                                    <option value="torta_rellena">Torta Plana Rellena 100% (Sin hueco central)</option>
-                                    <option value="rosa_polar">Rosa Polar (Triángulos desde el eje central sin hueco)</option>
-                                    <option value="torta">Gráfica de Torta Clásica</option>
-                                    <option value="dona">Gráfica de Dona Moderna</option>
-                                    <option value="torta_4d">Dona 3D / 4D (Relieve & Glow)</option>
-                                    <option value="semicirculo">Semicírculo / Tacómetro (180°)</option>
-                                    <option value="barras_radiales">Anillos Radiales Concéntricos</option>
-                                  </optgroup>
-                                  <optgroup label="Gráficas de Barras">
-                                    <option value="barras">Barras Verticales Clásicas</option>
-                                    <option value="barras_horizontales">Barras Horizontales (Ranking)</option>
-                                    <option value="barras_apiladas">Barras Apiladas Comparativas</option>
-                                    <option value="barras_3d_apiladas">Barras 3D Apiladas con Sombra</option>
-                                    <option value="barras_4d">Barras 3D / 4D (Cilindro Iluminado)</option>
-                                  </optgroup>
-                                  <optgroup label="Tendencias, Jerarquía y Mapas">
-                                    <option value="lineas">Gráfica de Líneas Rectas</option>
-                                    <option value="lineas_curvas">Gráfica de Líneas Curvas Suaves (Spline)</option>
-                                    <option value="area">Gráfica de Área</option>
-                                    <option value="area_apilada">Gráfica de Áreas Apiladas</option>
-                                    <option value="combinada">Gráfica Combinada (Barras + Línea)</option>
-                                    <option value="dispersion">Gráfica de Dispersión (Puntos)</option>
-                                    <option value="radar">Gráfica de Radar (Araña)</option>
-                                    <option value="radar_relleno">Radar Circular Relleno (Triángulos en Red)</option>
-                                    <option value="embudo">Gráfica de Embudo (Funnel)</option>
-                                    <option value="treemap">Mapa de Árbol Jerárquico (Treemap)</option>
-                                    <option value="mapa_colombia">Mapa Geográfico de Colombia</option>
-                                  </optgroup>
-                                </select>
-                              </div>
-
-                              {bloque.tablaRef && (() => {
-                                const { datos, cabeceras, ejesYUsar } = formatearDatosParaGrafica(bloque);
-                                if (cabeceras.length === 0) {
-                                  return <div className="col-span-2 text-sm text-red-500">Tabla fuente no válida o vacía.</div>;
-                                }
-                                
-                                const usaColorPorFila = esGraficaPorSegmento(bloque.tipoGrafica) || (['barras', 'barras_horizontales', 'barras_4d'].includes(bloque.tipoGrafica) && ejesYUsar.length === 1);
-
-                                return (
-                                  <>
-                                    <div className="col-span-1 md:col-span-2 border-t border-slate-200 my-2"></div>
-                                    <div>
-                                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-                                        {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Ubicación (Departamento/Ciudad)' : 'Eje X (Categorías / Periodos)'}
-                                      </label>
-                                      <select 
-                                        value={bloque.ejeX} 
-                                        onChange={(e) => actualizarGrafica(bloque.id, 'ejeX', Number(e.target.value))}
-                                        className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
-                                      >
-                                        {cabeceras.map((cab, i) => (
-                                          <option key={i} value={i}>{cab || `Columna ${i + 1}`}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    
-                                    <div>
-                                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-                                        {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Valores Numéricos o %)'}
-                                      </label>
-                                      <div className="space-y-2 max-h-32 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
-                                        {cabeceras.map((cab, i) => {
-                                          if (i === Number(bloque.ejeX)) return null; 
-                                          const isChecked = (bloque.ejesY || []).includes(i);
-                                          return (
-                                            <label key={i} className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
-                                              <input 
-                                                type="checkbox" 
-                                                checked={isChecked}
-                                                onChange={(e) => {
-                                                  let nuevosEjesY = [...(bloque.ejesY || [])];
-                                                  if (e.target.checked) {
-                                                    if (bloque.tipoGrafica === 'mapa_colombia') nuevosEjesY = [i];
-                                                    else nuevosEjesY.push(i);
-                                                  } else {
-                                                    nuevosEjesY = nuevosEjesY.filter(val => val !== i);
-                                                  }
-                                                  actualizarGrafica(bloque.id, 'ejesY', nuevosEjesY);
-                                                }}
-                                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                              />
-                                              {cab || `Columna ${i + 1}`}
-                                            </label>
-                                          );
-                                        })}
-                                        {(!bloque.ejesY || bloque.ejesY.length === 0) && (
-                                          <p className="text-xs text-slate-400 italic">⚠️ El sistema usará la primera columna numérica por defecto.</p>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* OPCIÓN PARA MOSTRAR U OCULTAR LA TABLA LATERAL DEL MAPA O ESTADÍSTICAS FIJAS */}
-                                    <div className="col-span-1 md:col-span-2 pt-2">
-                                      <label className="flex items-center gap-3 text-sm font-bold text-slate-800 cursor-pointer bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-sm">
-                                        <input
-                                          type="checkbox"
-                                          checked={!!bloque.mostrarValores}
-                                          onChange={(e) => actualizarGrafica(bloque.id, 'mostrarValores', e.target.checked)}
-                                          className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
-                                        />
-                                        {bloque.tipoGrafica === 'mapa_colombia'
-                                          ? 'Mostrar tabla lateral de valores por departamento (Desmárcala para dejar solo el mapa limpio con valores al pasar el cursor)'
-                                          : 'Mostrar valores numéricos / estadísticas fijos encima de la gráfica (Sin necesidad de pasar el mouse)'}
-                                      </label>
-                                    </div>
-
-                                    {/* PERSONALIZACIÓN DINÁMICA EXACTA DE COLORES SEGÚN LA CANTIDAD REAL DE CAMPOS */}
-                                    <div className="col-span-1 md:col-span-2 mt-2 pt-6 border-t border-slate-200">
-                                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                        <Palette size={16} /> Personalización Exacta de Colores ({bloque.tipoGrafica === 'mapa_colombia' ? 1 : (usaColorPorFila ? datos.length : ejesYUsar.length)} elementos activos)
-                                      </h4>
-                                      <p className="text-xs text-slate-400 mb-4">
-                                        💡 También puedes hacer <strong>clic directamente sobre cualquier barra o segmento en la Vista Previa</strong> de abajo para cambiar su color.
-                                      </p>
-                                      
-                                      {bloque.tipoGrafica === 'mapa_colombia' ? (
-                                        <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 w-fit">
-                                          <input 
-                                            type="color" 
-                                            value={bloque.coloresCustom?.[0] || edicionActiva.color_principal || '#93c5fd'} 
-                                            onChange={(e) => actualizarGraficaColor(bloque.id, 0, e.target.value)} 
-                                            className="w-10 h-10 cursor-pointer rounded-lg border-2"
-                                          />
-                                          <div>
-                                            <span className="block text-sm font-bold text-slate-800">Color principal del Mapa</span>
-                                            <span className="block text-xs text-slate-500">Tono fuerte del gradiente</span>
-                                          </div>
-                                        </div>
-                                      ) : usaColorPorFila ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
-                                          {datos.map((d: any, idx: number) => (
-                                            <div key={idx} className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 transition-colors">
-                                              <input 
-                                                type="color" 
-                                                value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
-                                                onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
-                                                className="w-7 h-7 cursor-pointer rounded-md border shrink-0"
-                                                title={`Cambiar color de ${d.name}`}
-                                              />
-                                              <span className="text-xs font-bold text-slate-700 truncate" title={d.name}>{d.name}</span>
+                                                {/* Botón Eliminar esta imagen */}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => eliminarImagenDeColumnaTexto(bloque.id, imgItem.colNum, imgItem.indice)}
+                                                  className="px-2.5 py-1 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                                  title="Eliminar esta imagen del texto"
+                                                >
+                                                  <Trash2 size={12} /> Quitar
+                                                </button>
+                                              </div>
                                             </div>
                                           ))}
                                         </div>
-                                      ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                          {ejesYUsar.map((ejeYIdx, idx) => {
-                                             const nombreEje = cabeceras[ejeYIdx] || `Serie ${idx + 1}`;
-                                             return (
-                                                <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
-                                                  <input 
-                                                    type="color" 
-                                                    value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
-                                                    onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
-                                                    className="w-8 h-8 cursor-pointer rounded-md border shrink-0"
-                                                  />
-                                                  <span className="text-sm font-bold text-slate-700 truncate">{nombreEje}</span>
-                                                </div>
-                                             );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {bloque.tipoGrafica === 'mapa_colombia' && datos.length > 0 && (
-                                      <div className="col-span-1 md:col-span-2 mt-4 bg-slate-800 p-6 rounded-xl border border-slate-700 text-white shadow-inner">
-                                          <h4 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
-                                              <MapIcon size={16} /> Diagnóstico Geoespacial
-                                          </h4>
-                                          <div className="overflow-x-auto rounded-lg border border-slate-700">
-                                              <table className="w-full text-xs text-left">
-                                                  <thead className="bg-slate-900 text-slate-400">
-                                                      <tr>
-                                                          <th className="p-3">Ubicación Extraída</th>
-                                                          <th className="p-3">Valor Numérico</th>
-                                                          <th className="p-3">Estado</th>
-                                                      </tr>
-                                                  </thead>
-                                                  <tbody className="divide-y divide-slate-700 bg-slate-800/50">
-                                                      {datos.map((d: any, i: number) => (
-                                                          <tr key={i} className="hover:bg-slate-800 transition-colors">
-                                                              <td className="p-3 font-medium text-blue-300">{d.name}</td>
-                                                              <td className="p-3 font-mono text-amber-300">{d.valorMapa}{d.esPorcentaje ? '%' : ''}</td>
-                                                              <td className="p-3">
-                                                                  {d.valorMapa > 0 
-                                                                      ? <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">✅ Listo</span>
-                                                                      : <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 font-bold">⚠️ Cero</span>}
-                                                              </td>
-                                                          </tr>
-                                                      ))}
-                                                  </tbody>
-                                              </table>
-                                          </div>
                                       </div>
                                     )}
+                                  </div>
 
-                                  </>
-                                );
-                              })()}
-                            </div>
+                                  {/* 3. GENERADOR DE BOTONES INLINE DENTRO DEL TEXTO */}
+                                  <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                                    <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                                      <MousePointerClick size={14} className="text-blue-600" /> Botón en Texto:
+                                    </span>
+                                    <input type="text" id={`in-btn-txt-${bloque.id}`} placeholder="Texto del botón" className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
+                                    <input type="text" id={`in-btn-url-${bloque.id}`} placeholder="https://... o elige página" className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
+                                    <select
+                                      onChange={(e) => {
+                                        const inputUrl = document.getElementById(`in-btn-url-${bloque.id}`) as HTMLInputElement;
+                                        if (inputUrl && e.target.value) inputUrl.value = `#pagina:${e.target.value}`;
+                                      }}
+                                      defaultValue=""
+                                      className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-44"
+                                    >
+                                      <option value="">Ir a página...</option>
+                                      {paginas.map((p, idx) => (
+                                        <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
+                                      ))}
+                                    </select>
+                                    <select id={`in-btn-style-${bloque.id}`} defaultValue="solido" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                      <option value="solido">Sólido</option>
+                                      <option value="pildora">Píldora (Ovalado)</option>
+                                      <option value="contorno">Contorno</option>
+                                      <option value="3d">3D Relieve</option>
+                                      <option value="4d">4D Glow (Iluminado)</option>
+                                    </select>
+                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color principal del botón">
+                                      <span className="text-[10px] font-bold text-slate-500">Fondo:</span>
+                                      <input type="color" id={`in-btn-bg-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                    </div>
+                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color del texto">
+                                      <span className="text-[10px] font-bold text-slate-500">Texto:</span>
+                                      <input type="color" id={`in-btn-tc-${bloque.id}`} defaultValue="#ffffff" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                    </div>
+                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-blue-200" title="Color de iluminación (para 4D Glow)">
+                                      <span className="text-[10px] font-bold text-blue-600">Luz 4D:</span>
+                                      <input type="color" id={`in-btn-glow-${bloque.id}`} defaultValue="#60a5fa" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const txt = (document.getElementById(`in-btn-txt-${bloque.id}`) as HTMLInputElement)?.value || 'Ver más';
+                                        const url = (document.getElementById(`in-btn-url-${bloque.id}`) as HTMLInputElement)?.value || 'https://acofi.edu.co';
+                                        const est = (document.getElementById(`in-btn-style-${bloque.id}`) as HTMLSelectElement)?.value || 'solido';
+                                        const bg = (document.getElementById(`in-btn-bg-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                        const tc = (document.getElementById(`in-btn-tc-${bloque.id}`) as HTMLInputElement)?.value || '#ffffff';
+                                        const glow = (document.getElementById(`in-btn-glow-${bloque.id}`) as HTMLInputElement)?.value || '#60a5fa';
+                                        const tag = `[[BOTON|${txt}|${url}|${est}|${bg}|${tc}|${glow}]]`;
+                                        actualizarBloqueTexto(bloque.id, `${bloque.contenido}<p>${tag}</p>`);
+                                      }}
+                                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                                    >
+                                      + Insertar Botón
+                                    </button>
+                                  </div>
+                                </div>
 
-                            {/* VISTA PREVIA FIEL AL TIPO DE GRÁFICA SELECCIONADO + POPUP AL CLIC EN ELEMENTO */}
-                            {bloque.tablaRef && (
+                                {bloque.contenido.includes('[[BOTON|') && (
+                                  <div className="p-5 bg-white border-t border-dashed border-slate-200 rounded-b-2xl">
+                                    <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Vista Previa Real del Texto con Botones:</span>
+                                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.contenido) }} />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {/* BLOQUE ESPECIAL DE FIRMAS CON CONTROL DE TAMAÑO REAL, POSICIÓN VERTICAL Y BOTÓN DE QUITAR SOLO IMAGEN */}
+                          {bloque.tipo === 'firma' && (
+                            <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
+                              <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <div className="flex flex-wrap items-center gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Alineación:</span>
+                                    <select
+                                      value={bloque.alineacion || 'espaciado'}
+                                      onChange={(e) => actualizarAlineacionBloqueFirma(bloque.id, e.target.value as BloqueFirma['alineacion'])}
+                                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                                    >
+                                      <option value="izquierda">Izquierda</option>
+                                      <option value="centro">Centro</option>
+                                      <option value="derecha">Derecha</option>
+                                      <option value="espaciado">Simétrico (Lado a Lado)</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Control de espacio general superior e inferior de todo el bloque de firmas */}
+                                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+                                    <span className="text-[11px] font-bold text-slate-600">Espacio Arriba del Bloque:</span>
+                                    <input
+                                      type="range"
+                                      min="-40"
+                                      max="140"
+                                      step="4"
+                                      value={bloque.espacioGeneralSuperior ?? 0}
+                                      onChange={(e) => actualizarPropiedadBloqueFirma(bloque.id, 'espacioGeneralSuperior', Number(e.target.value))}
+                                      className="w-20 accent-amber-600 cursor-pointer"
+                                    />
+                                    <span className="text-xs font-black text-amber-700 min-w-9 text-right">{bloque.espacioGeneralSuperior ?? 0}px</span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => agregarSegundaFirmaAlBloque(bloque.id)}
+                                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                                >
+                                  <Plus size={14} /> Agregar otra firma al lado
+                                </button>
+                              </div>
+
+                              <div className={`grid grid-cols-1 ${bloque.firmas.length > 1 ? 'md:grid-cols-2' : ''} gap-6`}>
+                                {bloque.firmas.map((fItem, fIdx) => {
+                                  const keyLoader = `${bloque.id}_firma_${fIdx}`;
+                                  return (
+                                    <div key={fItem.id || fIdx} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 relative">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-xs font-black uppercase tracking-widest text-amber-700">Firma #{fIdx + 1}</span>
+                                        <div className="flex items-center gap-2">
+                                          {fItem.url && (
+                                            <button
+                                              type="button"
+                                              onClick={() => quitarSoloImagenFirma(bloque.id, fIdx)}
+                                              className="bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                              title="Borra únicamente la imagen de la firma pero conserva el nombre y cargo"
+                                            >
+                                              <X size={12} /> Quitar solo imagen
+                                            </button>
+                                          )}
+                                          {bloque.firmas.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => eliminarFirmaDelBloque(bloque.id, fIdx)}
+                                              className="text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Trash2 size={13} /> Borrar firmante
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="relative flex-1">
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => manejarSubidaImagenFirma(e, bloque.id, fIdx)}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                            disabled={subiendoImagen[keyLoader]}
+                                          />
+                                          <button type="button" className="w-full px-3 py-2.5 bg-white border border-slate-300 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2">
+                                            {subiendoImagen[keyLoader] ? <RefreshCcw size={14} className="animate-spin" /> : <Upload size={14} />}
+                                            {subiendoImagen[keyLoader] ? 'Subiendo firma...' : 'Subir Imagen de Firma (PNG/JPG)'}
+                                          </button>
+                                        </div>
+                                        <input
+                                          type="text"
+                                          value={fItem.url || ''}
+                                          onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'url', e.target.value)}
+                                          placeholder="O pegar URL de la firma..."
+                                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
+                                        />
+                                      </div>
+
+                                      {/* SLIDER DE TAMAÑO / ALTURA DE LA IMAGEN DE FIRMA (FUNCIONAL AL 100%) */}
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-3.5 rounded-xl border border-slate-200">
+                                        <div>
+                                          <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
+                                            <span>Tamaño de Imagen Firma</span>
+                                            <span className="text-blue-600 font-black">{fItem.tamanoFirma ?? 72}px</span>
+                                          </label>
+                                          <input
+                                            type="range"
+                                            min="16"
+                                            max="240"
+                                            step="2"
+                                            value={fItem.tamanoFirma ?? 72}
+                                            onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'tamanoFirma', Number(e.target.value))}
+                                            className="w-full accent-blue-600 cursor-pointer"
+                                          />
+                                        </div>
+
+                                        {/* SLIDER PARA SUBIR O BAJAR ESTA FIRMA INDIVIDUALMENTE */}
+                                        <div>
+                                          <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
+                                            <span>Subir / Bajar Firma</span>
+                                            <span className="text-amber-600 font-black">{fItem.espacioSuperior ?? 0}px</span>
+                                          </label>
+                                          <input
+                                            type="range"
+                                            min="-50"
+                                            max="120"
+                                            step="2"
+                                            value={fItem.espacioSuperior ?? 0}
+                                            onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'espacioSuperior', Number(e.target.value))}
+                                            className="w-full accent-amber-600 cursor-pointer"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 gap-3">
+                                        <input
+                                          type="text"
+                                          value={fItem.nombre}
+                                          onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'nombre', e.target.value)}
+                                          placeholder="Nombre completo (Ej: Luis Alberto González Araujo)"
+                                          className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={fItem.cargo}
+                                          onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'cargo', e.target.value)}
+                                          placeholder="Cargo (Ej: Director ejecutivo ACOFI)"
+                                          className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={fItem.infoAdicional || ''}
+                                          onChange={(e) => actualizarItemFirma(bloque.id, fIdx, 'infoAdicional', e.target.value)}
+                                          placeholder="Línea adicional opcional (Ej: Editor de la publicación)"
+                                          className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* VISTA PREVIA FIEL DE LAS FIRMAS CON TAMAÑO Y ESPACIADO EN TIEMPO REAL */}
                               <div 
-                                className="mt-8 p-6 border-2 border-dashed border-slate-200 rounded-xl relative mx-auto transition-all"
+                                className={`p-6 bg-white rounded-2xl border border-dashed border-slate-300 flex flex-wrap gap-12 items-end ${
+                                  bloque.alineacion === 'centro' ? 'justify-center text-center' :
+                                  bloque.alineacion === 'derecha' ? 'justify-end text-right' :
+                                  bloque.alineacion === 'espaciado' ? 'justify-around text-left' :
+                                  'justify-start text-left'
+                                }`}
+                                style={{
+                                  paddingTop: `${Math.max(8, 24 + (bloque.espacioGeneralSuperior ?? 0))}px`,
+                                  paddingBottom: `${Math.max(8, 24 + (bloque.espacioGeneralInferior ?? 0))}px`
+                                }}
+                              >
+                                {bloque.firmas.map((fItem, i) => (
+                                  <div 
+                                    key={i} 
+                                    className="flex flex-col space-y-1 min-w-52 transition-all"
+                                    style={{ marginTop: `${fItem.espacioSuperior ?? 0}px` }}
+                                  >
+                                    {fItem.url ? (
+                                      <div className={`mb-2 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                        <img
+                                          src={fItem.url}
+                                          alt={fItem.nombre}
+                                          style={{ 
+                                            height: `${fItem.tamanoFirma ?? 72}px`, 
+                                            maxHeight: `${fItem.tamanoFirma ?? 72}px`,
+                                            width: 'auto' 
+                                          }}
+                                          className="object-contain transition-all"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="h-10 w-44 border-b border-slate-300 mb-2 flex items-end pb-1 text-[10px] italic text-slate-400">
+                                        (Sin imagen de firma — solo texto)
+                                      </div>
+                                    )}
+                                    <span className="font-bold text-slate-900 text-base">{fItem.nombre}</span>
+                                    <span className="text-slate-600 text-sm">{fItem.cargo}</span>
+                                    {fItem.infoAdicional && <span className="text-slate-500 text-xs italic">{fItem.infoAdicional}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* CONFIGURADOR DE BLOQUE BOTÓN */}
+                          {bloque.tipo === 'boton' && (
+                            <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Texto del Botón</label>
+                                  <input
+                                    type="text"
+                                    value={bloque.texto}
+                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'texto', e.target.value)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500"
+                                    placeholder="Ej: Descargar Informe PDF"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Enlace / URL o Página del Libro</label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={bloque.url}
+                                      onChange={(e) => actualizarBloqueBoton(bloque.id, 'url', e.target.value)}
+                                      className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                      placeholder="https://... o selecciona una hoja"
+                                    />
+                                    <select
+                                      value={bloque.url.startsWith('#pagina:') ? bloque.url.replace('#pagina:', '') : ''}
+                                      onChange={(e) => {
+                                        if (e.target.value) actualizarBloqueBoton(bloque.id, 'url', `#pagina:${e.target.value}`);
+                                      }}
+                                      className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none max-w-44"
+                                    >
+                                      <option value="">O ir a página...</option>
+                                      {paginas.map((p, idx) => (
+                                        <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Estilo Visual del Botón</label>
+                                  <select
+                                    value={bloque.estilo}
+                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'estilo', e.target.value as EstiloBoton)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    <option value="solido">Sólido Clásico (Bordes redondeados)</option>
+                                    <option value="pildora">Ovalado / Píldora Moderna</option>
+                                    <option value="contorno">Contorno Elegante (Transparente)</option>
+                                    <option value="3d">3D con Relieve Físico</option>
+                                    <option value="4d">4D Iluminado (Sombra de Neón Estática)</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Alineación en la Página</label>
+                                  <select
+                                    value={bloque.alineacion}
+                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'alineacion', e.target.value)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    <option value="izquierda">Izquierda</option>
+                                    <option value="centro">Centro</option>
+                                    <option value="derecha">Derecha</option>
+                                  </select>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-200">
+                                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                                    <input
+                                      type="color"
+                                      value={bloque.colorBoton || '#1d4ed8'}
+                                      onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorBoton', e.target.value)}
+                                      className="w-10 h-10 rounded cursor-pointer border"
+                                    />
+                                    <div>
+                                      <span className="block text-xs font-bold text-slate-700">Color Principal</span>
+                                      <span className="text-[10px] text-slate-400">{bloque.colorBoton}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                                    <input
+                                      type="color"
+                                      value={bloque.colorTexto || '#ffffff'}
+                                      onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorTexto', e.target.value)}
+                                      className="w-10 h-10 rounded cursor-pointer border"
+                                    />
+                                    <div>
+                                      <span className="block text-xs font-bold text-slate-700">Color de Texto</span>
+                                      <span className="text-[10px] text-slate-400">{bloque.colorTexto}</span>
+                                    </div>
+                                  </div>
+
+                                  {bloque.estilo === '4d' && (
+                                    <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-blue-200">
+                                      <input
+                                        type="color"
+                                        value={bloque.colorIluminacion || '#60a5fa'}
+                                        onChange={(e) => actualizarBloqueBoton(bloque.id, 'colorIluminacion', e.target.value)}
+                                        className="w-10 h-10 rounded cursor-pointer border"
+                                      />
+                                      <div>
+                                        <span className="block text-xs font-bold text-blue-700">Luz 4D (Resplandor)</span>
+                                        <span className="text-[10px] text-slate-400">{bloque.colorIluminacion || '#60a5fa'}</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className={`p-6 bg-slate-100/70 rounded-xl border border-dashed border-slate-300 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                <a
+                                  href={bloque.url || '#'}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.preventDefault()}
+                                  style={{
+                                    backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
+                                    color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
+                                    borderColor: bloque.colorBoton,
+                                    boxShadow: bloque.estilo === '3d' 
+                                      ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
+                                      : bloque.estilo === '4d'
+                                      ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
+                                      : undefined
+                                  }}
+                                  className={`px-8 py-4 font-sans font-black text-sm uppercase tracking-wider transition-all inline-block ${
+                                    bloque.estilo === 'pildora' ? 'rounded-full shadow-md' :
+                                    bloque.estilo === 'contorno' ? 'rounded-xl border-2' :
+                                    bloque.estilo === '3d' ? 'rounded-xl -translate-y-1' :
+                                    bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
+                                    'rounded-xl shadow-md'
+                                  }`}
+                                >
+                                  {bloque.texto || 'Botón'}
+                                </a>
+                              </div>
+                            </div>
+                          )}
+
+                          {bloque.tipo === 'imagen' && (
+                            <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
+                              <div className="flex flex-col gap-6 mb-6">
+                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                                  <div className="w-full md:w-1/2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Opción 1: Subir Archivo Local</label>
+                                    <div className="relative group">
+                                      <input type="file" accept="image/*" onChange={(e) => manejarSubidaImagen(e, bloque.id)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled={subiendoImagen[bloque.id]} />
+                                      <button type="button" className={`w-full px-6 py-4 rounded-xl text-sm font-bold shadow-sm flex justify-center items-center gap-3 transition-colors ${subiendoImagen[bloque.id] ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 group-hover:shadow-md'}`}>
+                                        {subiendoImagen[bloque.id] ? <RefreshCcw size={20} className="animate-spin" /> : <Upload size={20} />}
+                                        {subiendoImagen[bloque.id] ? 'Subiendo archivo a la nube...' : 'Seleccionar Imagen de tu PC'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="hidden md:flex flex-col items-center justify-center px-2">
+                                    <div className="h-6 w-px bg-slate-300"></div>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest my-2">O</span>
+                                    <div className="h-6 w-px bg-slate-300"></div>
+                                  </div>
+                                  <div className="w-full md:w-1/2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Opción 2: Enlace Externo (URL)</label>
+                                    <input type="text" value={bloque.url} onChange={(e) => { const nuevasPaginas = [...paginas]; const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueImagen; if (b) { b.url = e.target.value; autoGuardar(nuevasPaginas); } }} className="w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors" placeholder="https://ejemplo.com/foto.jpg" />
+                                  </div>
+                                </div>
+
+                                <label className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer p-3 hover:bg-slate-50 rounded-xl bg-white border border-slate-200 w-fit shadow-sm">
+                                  <input type="checkbox" checked={bloque.pantallaCompleta} onChange={(e) => { const nuevasPaginas = [...paginas]; const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueImagen; if (b) { b.pantallaCompleta = e.target.checked; autoGuardar(nuevasPaginas); } }} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                  <span className="font-bold">Imagen de Sangrado Completo (Full Bleed)</span>
+                                </label>
+                              </div>
+
+                              {bloque.url && (
+                                <div className="mt-6 rounded-2xl overflow-hidden border-4 border-slate-100 bg-slate-50 flex justify-center items-center shadow-inner relative">
+                                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm text-xs font-bold uppercase tracking-widest text-slate-600">Vista Previa</div>
+                                  <img src={bloque.url} alt="Vista previa" className="w-full h-auto object-contain max-h-100" />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* TABLA CON VISTA PREVIA ULTRA COMPACTA REAL */}
+                          {bloque.tipo === 'tabla' && (
+                            <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                <input 
+                                  type="text" 
+                                  value={bloque.nombre} 
+                                  onChange={(e) => {
+                                    const nuevasPaginas = [...paginas];
+                                    const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloque.id) as BloqueTabla;
+                                    if (b) { b.nombre = e.target.value; autoGuardar(nuevasPaginas); }
+                                  }}
+                                  className="text-lg font-bold text-slate-800 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full md:w-2/3"
+                                  placeholder="Título de la tabla (Ej. Datos Ing. Civil)"
+                                />
+                                
+                                <button 
+                                  onClick={() => alternarVisibilidadTabla(bloque.id)}
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${bloque.oculto ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                >
+                                  {bloque.oculto ? <EyeOff size={16} /> : <Eye size={16} />}
+                                  {bloque.oculto ? 'Tabla Oculta' : 'Tabla Visible'}
+                                </button>
+                              </div>
+                              
+                              <div 
+                                className="overflow-x-auto border border-slate-200 rounded-xl mx-auto transition-all"
                                 style={{ 
                                   backgroundColor: bloque.colorFondo || '#ffffff',
                                   width: `${Math.min(100, bloque.escala || 100)}%`,
                                   zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
                                 }}
                               >
-                                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                                  <h4 className="text-xs font-bold uppercase text-slate-400 tracking-widest">
-                                    Vista Previa Interactiva ({bloque.tipoGrafica}) — Haz clic en un elemento de la gráfica para cambiar su color
-                                  </h4>
-                                  {selectorColorActivo && selectorColorActivo.bloqueId === bloque.id && (
-                                    <div className="flex items-center gap-3 bg-slate-900 text-white px-4 py-2 rounded-xl shadow-lg animate-in fade-in duration-200">
-                                      <span className="text-xs font-bold">Color de &quot;{selectorColorActivo.etiqueta}&quot;:</span>
-                                      <input
-                                        type="color"
-                                        value={bloque.coloresCustom?.[selectorColorActivo.indice] || COLORES_GRAFICAS_DEFAULT[selectorColorActivo.indice % COLORES_GRAFICAS_DEFAULT.length]}
-                                        onChange={(e) => actualizarGraficaColor(bloque.id, selectorColorActivo.indice, e.target.value)}
-                                        className="w-7 h-7 rounded cursor-pointer border-0"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectorColorActivo(null)}
-                                        className="text-slate-400 hover:text-white cursor-pointer"
-                                      >
-                                        <X size={14} />
-                                      </button>
-                                    </div>
+                                <table 
+                                  className="w-full text-left border-collapse" 
+                                  style={{ 
+                                    backgroundColor: bloque.colorFondo || '#ffffff',
+                                    fontSize: `${bloque.tamanoTextoTabla ?? 14}px`
+                                  }}
+                                >
+                                  <thead>
+                                    <tr className="bg-slate-100/80 border-b border-slate-200">
+                                      {bloque.data[0]?.map((_, cIndex) => {
+                                        const anchoCol = bloque.anchosColumnas?.[cIndex];
+                                        return (
+                                          <th 
+                                            key={cIndex} 
+                                            className="p-1 text-center border-r border-slate-200 last:border-r-0"
+                                            style={anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : undefined}
+                                          >
+                                            <div className="flex flex-col items-center gap-1">
+                                              <div className="flex items-center justify-center gap-0.5 flex-nowrap whitespace-nowrap">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => moverColumnaTabla(bloque.id, cIndex, 'izq')}
+                                                  disabled={cIndex === 0}
+                                                  className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
+                                                  title="Mover columna a la izquierda"
+                                                >
+                                                  <MoveLeft size={11} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => moverColumnaTabla(bloque.id, cIndex, 'der')}
+                                                  disabled={cIndex === (bloque.data[0]?.length || 1) - 1}
+                                                  className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
+                                                  title="Mover columna a la derecha"
+                                                >
+                                                  <MoveRight size={11} />
+                                                </button>
+                                                <input
+                                                  type="color"
+                                                  value={bloque.coloresColumnas?.[cIndex] || bloque.colorFondo || '#ffffff'}
+                                                  onChange={(e) => actualizarColorColumnaTabla(bloque.id, cIndex, e.target.value)}
+                                                  className="w-4 h-4 rounded cursor-pointer border-0 p-0 shrink-0"
+                                                  title="Color de esta columna"
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => insertarColumnaEnPosicion(bloque.id, cIndex)}
+                                                  className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-1 py-0.5 rounded cursor-pointer"
+                                                  title="Insertar columna a la derecha de esta"
+                                                >
+                                                  +Col
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => eliminarColumnaTabla(bloque.id, cIndex)}
+                                                  className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-1 py-0.5 rounded inline-flex items-center cursor-pointer"
+                                                  title="Eliminar esta columna"
+                                                >
+                                                  <X size={11} />
+                                                </button>
+                                              </div>
+                                              <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] text-slate-500">
+                                                <span>Ancho:</span>
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  max="800"
+                                                  placeholder="Auto"
+                                                  value={bloque.anchosColumnas?.[cIndex] || ''}
+                                                  onChange={(e) => actualizarAnchoColumnaTabla(bloque.id, cIndex, Number(e.target.value))}
+                                                  className="w-11 text-center font-bold text-slate-700 outline-none bg-transparent"
+                                                  title="Ancho en píxeles para esta columna (0 o vacío = Automático)"
+                                                />
+                                                <span>px</span>
+                                              </div>
+                                            </div>
+                                          </th>
+                                        );
+                                      })}
+                                      <th className="w-44 bg-slate-100/80 text-center text-[10px] font-bold uppercase text-slate-400 px-2">Filas / Alto</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-200/60">
+                                    {bloque.data.map((fila, fIndex) => {
+                                      const colorFila = bloque.coloresFilas?.[fIndex];
+                                      const padGeneral = bloque.paddingFila ?? 6;
+                                      const altoIndividual = bloque.altosFilas?.[fIndex];
+                                      const padVertical = altoIndividual !== undefined && altoIndividual > 0
+                                        ? Math.max(0, Math.round((altoIndividual - (bloque.tamanoTextoTabla ?? 14)) / 2))
+                                        : padGeneral;
+                                      const fontSizeCelda = fIndex === 0
+                                        ? Math.max(9, (bloque.tamanoTextoTabla ?? 14) - 1)
+                                        : (bloque.tamanoTextoTabla ?? 14);
+                                      const alturaExactaInput = altoIndividual !== undefined && altoIndividual > 0
+                                        ? altoIndividual
+                                        : Math.max(16, Math.round(fontSizeCelda * 1.15) + padVertical * 2);
+
+                                      return (
+                                        <tr 
+                                          key={fIndex} 
+                                          className={fIndex === 0 ? "font-bold" : ""}
+                                          style={{ 
+                                            backgroundColor: colorFila || bloque.colorFondo || '#ffffff',
+                                            height: `${alturaExactaInput}px`
+                                          }}
+                                        >
+                                          {fila.map((celda, cIndex) => {
+                                            const colorCol = bloque.coloresColumnas?.[cIndex];
+                                            const bgCelda = colorFila || colorCol || bloque.colorFondo || '#ffffff';
+                                            const anchoCol = bloque.anchosColumnas?.[cIndex];
+                                            return (
+                                              <td 
+                                                key={cIndex} 
+                                                className="border-r border-slate-200/60 p-0 last:border-r-0 align-middle"
+                                                style={{ 
+                                                  backgroundColor: bgCelda,
+                                                  height: `${alturaExactaInput}px`,
+                                                  ...(anchoCol ? { width: `${anchoCol}px`, minWidth: `${anchoCol}px`, maxWidth: `${anchoCol}px` } : {})
+                                                }}
+                                              >
+                                                <input 
+                                                  type="text" 
+                                                  value={celda} 
+                                                  onChange={(e) => actualizarCeldaTabla(bloque.id, fIndex, cIndex, e.target.value)}
+                                                  style={{ 
+                                                    backgroundColor: 'transparent',
+                                                    fontSize: `${fontSizeCelda}px`,
+                                                    lineHeight: 1.1,
+                                                    height: `${alturaExactaInput}px`,
+                                                    minHeight: '0px',
+                                                    paddingTop: `${padVertical}px`,
+                                                    paddingBottom: `${padVertical}px`,
+                                                    paddingLeft: '14px',
+                                                    paddingRight: '14px',
+                                                    boxSizing: 'border-box'
+                                                  }}
+                                                  className={`w-full block m-0 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-all ${fIndex === 0 ? 'font-bold uppercase tracking-wider text-slate-800' : (cIndex === 0 ? 'font-semibold text-slate-800' : 'text-slate-700')}`}
+                                                />
+                                              </td>
+                                            );
+                                          })}
+                                          <td 
+                                            className="py-0 px-1.5 text-center w-44 bg-slate-50/90 border-l border-slate-200 align-middle"
+                                            style={{ height: `${alturaExactaInput}px` }}
+                                          >
+                                            <div className="flex items-center justify-center gap-1 flex-nowrap whitespace-nowrap leading-none">
+                                              <button
+                                                type="button"
+                                                onClick={() => moverFilaTabla(bloque.id, fIndex, 'arriba')}
+                                                disabled={fIndex === 0}
+                                                className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
+                                                title="Subir fila"
+                                              >
+                                                <ArrowUp size={11} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => moverFilaTabla(bloque.id, fIndex, 'abajo')}
+                                                disabled={fIndex === bloque.data.length - 1}
+                                                className="p-0.5 text-slate-500 hover:text-blue-600 disabled:opacity-25 cursor-pointer"
+                                                title="Bajar fila"
+                                              >
+                                                <ArrowDown size={11} />
+                                              </button>
+                                              <input
+                                                type="color"
+                                                value={bloque.coloresFilas?.[fIndex] || bloque.colorFondo || '#ffffff'}
+                                                onChange={(e) => actualizarColorFilaTabla(bloque.id, fIndex, e.target.value)}
+                                                className="w-3.5 h-3.5 rounded cursor-pointer border-0 p-0 shrink-0"
+                                                title="Color de esta fila"
+                                              />
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="150"
+                                                placeholder={`${alturaExactaInput}`}
+                                                value={bloque.altosFilas?.[fIndex] || ''}
+                                                onChange={(e) => actualizarAltoFilaTabla(bloque.id, fIndex, Number(e.target.value))}
+                                                className="w-9 h-4 text-[10px] font-bold text-center bg-white border border-slate-200 rounded p-0 outline-none leading-none"
+                                                title="Alto individual de esta fila en px (vacío = usa el espacio general)"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => insertarFilaEnPosicion(bloque.id, fIndex)}
+                                                className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-1 py-0 rounded leading-none cursor-pointer"
+                                                title="Insertar fila debajo de esta"
+                                              >
+                                                +F
+                                              </button>
+                                              {fIndex > 0 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => eliminarFilaTabla(bloque.id, fIndex)}
+                                                  className="p-0.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                                  title="Eliminar esta fila"
+                                                >
+                                                  <Trash2 size={11} />
+                                                </button>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div className="flex gap-2 mt-4">
+                                <button onClick={() => agregarFilaTabla(bloque.id)} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"><Plus size={14} /> Fila al Final</button>
+                                <button onClick={() => agregarColumnaTabla(bloque.id)} className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"><Plus size={14} /> Columna al Final</button>
+                              </div>
+
+                              <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
+                                <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
+                                  <Type size={14} className="text-blue-600" />
+                                  <span>+ Agregar texto / fuente / nota justo debajo de esta tabla (sin espacio de bloque)</span>
+                                </summary>
+                                <div className="mt-3 bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-16 [&_.ql-editor]:text-sm">
+                                  <ReactQuill
+                                    theme="snow"
+                                    modules={quillModules}
+                                    value={bloque.pieBloque || ''}
+                                    onChange={(val) => actualizarPropiedadTabla(bloque.id, 'pieBloque', val)}
+                                    placeholder="Ej: Fuente: Elaboración propia ACOFI 2025..."
+                                  />
+                                </div>
+                              </details>
+                            </div>
+                          )}
+
+                          {bloque.tipo === 'grafica' && (
+                            <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
+                              <input 
+                                type="text" 
+                                value={bloque.nombre} 
+                                onChange={(e) => actualizarGrafica(bloque.id, 'nombre', e.target.value)}
+                                className="text-lg font-bold text-slate-800 mb-6 bg-transparent outline-none border-b-2 border-transparent focus:border-blue-500 w-full"
+                                placeholder="Título de la gráfica o mapa"
+                              />
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-xl border border-slate-200">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Fuente de Datos</label>
+                                  <select 
+                                    value={bloque.tablaRef} 
+                                    onChange={(e) => actualizarGrafica(bloque.id, 'tablaRef', e.target.value)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    <option value="">-- Seleccionar Tabla --</option>
+                                    {todasLasTablasAdmin.map(t => (
+                                      <option key={t.id} value={t.id}>{t.nombre || 'Tabla sin nombre'} ({t.nombrePagina}) {t.oculto ? '👁️‍🗨️' : ''}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Tipo de Visualización Premium</label>
+                                  <select 
+                                    value={bloque.tipoGrafica} 
+                                    onChange={(e) => actualizarGrafica(bloque.id, 'tipoGrafica', e.target.value as TipoGrafica)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    <optgroup label="Gráficas Circulares 3D y Rellenas (Sin Hueco / Con Hueco)">
+                                      <option value="torta_3d_rellena">Torta 3D Rellena 100% (Sin hueco en el centro)</option>
+                                      <option value="torta_rellena">Torta Plana Rellena 100% (Sin hueco central)</option>
+                                      <option value="rosa_polar">Rosa Polar (Triángulos desde el eje central sin hueco)</option>
+                                      <option value="torta">Gráfica de Torta Clásica</option>
+                                      <option value="dona">Gráfica de Dona Moderna</option>
+                                      <option value="torta_4d">Dona 3D / 4D (Relieve & Glow)</option>
+                                      <option value="semicirculo">Semicírculo / Tacómetro (180°)</option>
+                                      <option value="barras_radiales">Anillos Radiales Concéntricos</option>
+                                    </optgroup>
+                                    <optgroup label="Gráficas de Barras">
+                                      <option value="barras">Barras Verticales Clásicas</option>
+                                      <option value="barras_horizontales">Barras Horizontales (Ranking)</option>
+                                      <option value="barras_apiladas">Barras Apiladas Comparativas</option>
+                                      <option value="barras_3d_apiladas">Barras 3D Apiladas con Sombra</option>
+                                      <option value="barras_4d">Barras 3D / 4D (Cilindro Iluminado)</option>
+                                    </optgroup>
+                                    <optgroup label="Tendencias, Jerarquía y Mapas">
+                                      <option value="lineas">Gráfica de Líneas Rectas</option>
+                                      <option value="lineas_curvas">Gráfica de Líneas Curvas Suaves (Spline)</option>
+                                      <option value="area">Gráfica de Área</option>
+                                      <option value="area_apilada">Gráfica de Áreas Apiladas</option>
+                                      <option value="combinada">Gráfica Combinada (Barras + Línea)</option>
+                                      <option value="dispersion">Gráfica de Dispersión (Puntos)</option>
+                                      <option value="radar">Gráfica de Radar (Araña)</option>
+                                      <option value="radar_relleno">Radar Circular Relleno (Triángulos en Red)</option>
+                                      <option value="embudo">Gráfica de Embudo (Funnel)</option>
+                                      <option value="treemap">Mapa de Árbol Jerárquico (Treemap)</option>
+                                      <option value="mapa_colombia">Mapa Geográfico de Colombia</option>
+                                    </optgroup>
+                                  </select>
+                                </div>
+
+                                {bloque.tablaRef && (() => {
+                                  const { datos, cabeceras, ejesYUsar } = formatearDatosParaGrafica(bloque);
+                                  if (cabeceras.length === 0) {
+                                    return <div className="col-span-2 text-sm text-red-500">Tabla fuente no válida o vacía.</div>;
+                                  }
+                                  
+                                  const usaColorPorFila = esGraficaPorSegmento(bloque.tipoGrafica) || (['barras', 'barras_horizontales', 'barras_4d'].includes(bloque.tipoGrafica) && ejesYUsar.length === 1);
+
+                                  return (
+                                    <>
+                                      <div className="col-span-1 md:col-span-2 border-t border-slate-200 my-2"></div>
+                                      <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                                          {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Ubicación (Departamento/Ciudad)' : 'Eje X (Categorías / Periodos)'}
+                                        </label>
+                                        <select 
+                                          value={bloque.ejeX} 
+                                          onChange={(e) => actualizarGrafica(bloque.id, 'ejeX', Number(e.target.value))}
+                                          className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                        >
+                                          {cabeceras.map((cab, i) => (
+                                            <option key={i} value={i}>{cab || `Columna ${i + 1}`}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                                          {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Valores Numéricos o %)'}
+                                        </label>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
+                                          {cabeceras.map((cab, i) => {
+                                            if (i === Number(bloque.ejeX)) return null; 
+                                            const isChecked = (bloque.ejesY || []).includes(i);
+                                            return (
+                                              <label key={i} className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                                                <input 
+                                                  type="checkbox" 
+                                                  checked={isChecked}
+                                                  onChange={(e) => {
+                                                    let nuevosEjesY = [...(bloque.ejesY || [])];
+                                                    if (e.target.checked) {
+                                                      if (bloque.tipoGrafica === 'mapa_colombia') nuevosEjesY = [i];
+                                                      else nuevosEjesY.push(i);
+                                                    } else {
+                                                      nuevosEjesY = nuevosEjesY.filter(val => val !== i);
+                                                    }
+                                                    actualizarGrafica(bloque.id, 'ejesY', nuevosEjesY);
+                                                  }}
+                                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                {cab || `Columna ${i + 1}`}
+                                              </label>
+                                            );
+                                          })}
+                                          {(!bloque.ejesY || bloque.ejesY.length === 0) && (
+                                            <p className="text-xs text-slate-400 italic">⚠️ El sistema usará la primera columna numérica por defecto.</p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="col-span-1 md:col-span-2 pt-2">
+                                        <label className="flex items-center gap-3 text-sm font-bold text-slate-800 cursor-pointer bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!bloque.mostrarValores}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'mostrarValores', e.target.checked)}
+                                            className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                                          />
+                                          {bloque.tipoGrafica === 'mapa_colombia'
+                                            ? 'Mostrar tabla lateral de valores por departamento (Desmárcala para dejar solo el mapa limpio con valores al pasar el cursor)'
+                                            : 'Mostrar valores numéricos / estadísticas fijos encima de la gráfica (Sin necesidad de pasar el mouse)'}
+                                        </label>
+                                      </div>
+
+                                      <div className="col-span-1 md:col-span-2 mt-2 pt-6 border-t border-slate-200">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                          <Palette size={16} /> Personalización Exacta de Colores ({bloque.tipoGrafica === 'mapa_colombia' ? 1 : (usaColorPorFila ? datos.length : ejesYUsar.length)} elementos activos)
+                                        </h4>
+                                        <p className="text-xs text-slate-400 mb-4">
+                                          💡 También puedes hacer <strong>clic directamente sobre cualquier barra o segmento en la Vista Previa</strong> de abajo para cambiar su color.
+                                        </p>
+                                        
+                                        {bloque.tipoGrafica === 'mapa_colombia' ? (
+                                          <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 w-fit">
+                                            <input 
+                                              type="color" 
+                                              value={bloque.coloresCustom?.[0] || edicionActiva.color_principal || '#93c5fd'} 
+                                              onChange={(e) => actualizarGraficaColor(bloque.id, 0, e.target.value)} 
+                                              className="w-10 h-10 cursor-pointer rounded-lg border-2"
+                                            />
+                                            <div>
+                                              <span className="block text-sm font-bold text-slate-800">Color principal del Mapa</span>
+                                              <span className="block text-xs text-slate-500">Tono fuerte del gradiente</span>
+                                            </div>
+                                          </div>
+                                        ) : usaColorPorFila ? (
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                                            {datos.map((d: any, idx: number) => (
+                                              <div key={idx} className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 transition-colors">
+                                                <input 
+                                                  type="color" 
+                                                  value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
+                                                  onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
+                                                  className="w-7 h-7 cursor-pointer rounded-md border shrink-0"
+                                                  title={`Cambiar color de ${d.name}`}
+                                                />
+                                                <span className="text-xs font-bold text-slate-700 truncate" title={d.name}>{d.name}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {ejesYUsar.map((ejeYIdx, idx) => {
+                                               const nombreEje = cabeceras[ejeYIdx] || `Serie ${idx + 1}`;
+                                               return (
+                                                  <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                                                    <input 
+                                                      type="color" 
+                                                      value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
+                                                      onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
+                                                      className="w-8 h-8 cursor-pointer rounded-md border shrink-0"
+                                                    />
+                                                    <span className="text-sm font-bold text-slate-700 truncate">{nombreEje}</span>
+                                                  </div>
+                                               );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+
+                              {bloque.tablaRef && (
+                                <div 
+                                  className="mt-8 p-6 border-2 border-dashed border-slate-200 rounded-xl relative mx-auto transition-all"
+                                  style={{ 
+                                    backgroundColor: bloque.colorFondo || '#ffffff',
+                                    width: `${Math.min(100, bloque.escala || 100)}%`,
+                                    zoom: (bloque.escala || 100) > 100 ? (bloque.escala || 100) / 100 : 1
+                                  }}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <h4 className="text-xs font-bold uppercase text-slate-400 tracking-widest">
+                                      Vista Previa Interactiva ({bloque.tipoGrafica}) — Haz clic en un elemento de la gráfica para cambiar su color
+                                    </h4>
+                                    {selectorColorActivo && selectorColorActivo.bloqueId === bloque.id && (
+                                      <div className="flex items-center gap-3 bg-slate-900 text-white px-4 py-2 rounded-xl shadow-lg animate-in fade-in duration-200">
+                                        <span className="text-xs font-bold">Color de &quot;{selectorColorActivo.etiqueta}&quot;:</span>
+                                        <input
+                                          type="color"
+                                          value={bloque.coloresCustom?.[selectorColorActivo.indice] || COLORES_GRAFICAS_DEFAULT[selectorColorActivo.indice % COLORES_GRAFICAS_DEFAULT.length]}
+                                          onChange={(e) => actualizarGraficaColor(bloque.id, selectorColorActivo.indice, e.target.value)}
+                                          className="w-7 h-7 rounded cursor-pointer border-0"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectorColorActivo(null)}
+                                          className="text-slate-400 hover:text-white cursor-pointer"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {renderizarGrafica(bloque)}
+                                  {bloque.pieBloque && (
+                                    <div 
+                                      className="mt-3 pt-2 border-t border-slate-100 prose prose-sm max-w-none text-slate-600"
+                                      dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.pieBloque) }}
+                                    />
                                   )}
                                 </div>
-                                {renderizarGrafica(bloque)}
-                                {bloque.pieBloque && (
-                                  <div 
-                                    className="mt-3 pt-2 border-t border-slate-100 prose prose-sm max-w-none text-slate-600"
-                                    dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(bloque.pieBloque) }}
+                              )}
+
+                              <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
+                                <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
+                                  <Type size={14} className="text-blue-600" />
+                                  <span>+ Agregar texto / fuente / nota justo debajo de esta gráfica (sin espacio de bloque)</span>
+                                </summary>
+                                <div className="mt-3 bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-16 [&_.ql-editor]:text-sm">
+                                  <ReactQuill
+                                    theme="snow"
+                                    modules={quillModules}
+                                    value={bloque.pieBloque || ''}
+                                    onChange={(val) => actualizarGrafica(bloque.id, 'pieBloque', val)}
+                                    placeholder="Ej: Nota: Cifras expresadas en porcentaje nacional..."
                                   />
-                                )}
-                              </div>
-                            )}
+                                </div>
+                              </details>
 
-                            {/* PIE / NOTA / FUENTE PEGADO JUSTO DEBAJO DE LA GRÁFICA */}
-                            <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
-                              <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
-                                <Type size={14} className="text-blue-600" />
-                                <span>+ Agregar texto / fuente / nota justo debajo de esta gráfica (sin espacio de bloque)</span>
-                              </summary>
-                              <div className="mt-3 bg-white border border-slate-200 rounded-xl [&_.ql-toolbar]:border-none [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-xl [&_.ql-container]:border-none [&_.ql-editor]:min-h-16 [&_.ql-editor]:text-sm">
-                                <ReactQuill
-                                  theme="snow"
-                                  modules={quillModules}
-                                  value={bloque.pieBloque || ''}
-                                  onChange={(val) => actualizarGrafica(bloque.id, 'pieBloque', val)}
-                                  placeholder="Ej: Nota: Cifras expresadas en porcentaje nacional..."
-                                />
-                              </div>
-                            </details>
-
-                          </div>
-                        )}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                    ))}
+
+                    <div className="flex flex-wrap items-center justify-center gap-4 py-8 border-t-2 border-dashed border-slate-200 mt-12">
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400 mr-2 w-full text-center md:w-auto">Insertar Bloque:</span>
+                      <button onClick={agregarBloqueTexto} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><Type size={18} /> Texto (1, 2 o 3 Col)</button>
+                      <button onClick={agregarBloqueFirma} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-amber-600 hover:text-amber-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><PenTool size={18} /> Firma(s)</button>
+                      <button onClick={agregarBloqueBoton} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-600 hover:text-indigo-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><MousePointerClick size={18} /> Botón Enlace</button>
+                      <button onClick={agregarBloqueImagen} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-pink-600 hover:text-pink-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><ImageIcon size={18} /> Imagen</button>
+                      <button onClick={agregarBloqueTabla} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-emerald-600 hover:text-emerald-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><TableIcon size={18} /> Tabla</button>
+                      <button onClick={agregarBloqueGrafica} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-purple-600 hover:text-purple-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><BarChart3 size={18} /> Gráfica o Mapa</button>
                     </div>
-                  ))}
-
-                  <div className="flex flex-wrap items-center justify-center gap-4 py-8 border-t-2 border-dashed border-slate-200 mt-12">
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400 mr-2 w-full text-center md:w-auto">Insertar Bloque:</span>
-                    <button onClick={agregarBloqueTexto} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-blue-600 hover:text-blue-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><Type size={18} /> Texto (1, 2 o 3 Col)</button>
-                    <button onClick={agregarBloqueFirma} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-amber-600 hover:text-amber-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><PenTool size={18} /> Firma(s)</button>
-                    <button onClick={agregarBloqueBoton} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-600 hover:text-indigo-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><MousePointerClick size={18} /> Botón Enlace</button>
-                    <button onClick={agregarBloqueImagen} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-pink-600 hover:text-pink-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><ImageIcon size={18} /> Imagen</button>
-                    <button onClick={agregarBloqueTabla} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-emerald-600 hover:text-emerald-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><TableIcon size={18} /> Tabla</button>
-                    <button onClick={agregarBloqueGrafica} className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-600 hover:border-purple-600 hover:text-purple-600 px-6 py-3 rounded-xl text-sm font-bold shadow-sm transition-all hover:-translate-y-1 cursor-pointer"><BarChart3 size={18} /> Gráfica o Mapa</button>
                   </div>
+
                 </div>
+              )}
 
-              </div>
-            )}
-
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center"><h3 className="text-2xl font-black text-slate-800">Ninguna edición activa</h3></div>
-        )}
-      </main>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center"><h3 className="text-2xl font-black text-slate-800">Ninguna edición activa</h3></div>
+          )}
+        </main>
+      )}
 
       {/* MODAL PARA INYECTAR LOTES DE PÁGINAS EN FORMATO JSON */}
       {modalImportarJsonAbierto && (
