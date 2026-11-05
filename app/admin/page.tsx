@@ -60,7 +60,7 @@ const NOMBRES_FUENTES_WORD: Record<string, { label: string; family: string }> = 
   'comic-sans-ms': { label: 'Comic Sans MS', family: '"Comic Sans MS", cursive, sans-serif' },
   'consolas': { label: 'Consolas', family: 'Consolas, monaco, monospace' },
   'constantia': { label: 'Constantia', family: 'Constantia, "Lucida Bright", Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif' },
-  'corbel': { label: 'Corbel', family: 'Corbel, "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "DejaVu Sans", "Liberation Sans", Verdana, "Verdana Ref", sans-serif' },
+  'corbel': { label: 'Corbel', family: 'Corbel, "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "DejaVu Sans", "Bitstream Vera Sans", "Liberation Sans", Verdana, "Verdana Ref", sans-serif' },
   'courier-new': { label: 'Courier New', family: '"Courier New", Courier, monospace' },
   'franklin-gothic-medium': { label: 'Franklin Gothic', family: '"Franklin Gothic Medium", "Franklin Gothic", "ITC Franklin Gothic", Arial, sans-serif' },
   'garamond': { label: 'Garamond', family: 'Garamond, Baskerville, "Baskerville Old Face", "Hoefler Text", "Times New Roman", serif' },
@@ -74,6 +74,74 @@ const NOMBRES_FUENTES_WORD: Record<string, { label: string; family: string }> = 
   'times-new-roman': { label: 'Times New Roman', family: '"Times New Roman", Times, Baskerville, Georgia, serif' },
   'trebuchet-ms': { label: 'Trebuchet MS', family: '"Trebuchet MS", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Tahoma, sans-serif' },
   'verdana': { label: 'Verdana', family: 'Verdana, Geneva, sans-serif' }
+};
+
+// CATÁLOGO DE PALETAS DE COLORES PARA LAS GRÁFICAS (COLORES SECUNDARIOS POR DEFECTO)
+const PALETAS_GRAFICAS: Record<string, { nombre: string; colores: string[] }> = {
+  secundarios: {
+    nombre: '🎨 Colores Secundarios (Por Defecto)',
+    colores: [
+      '#f97316', '#8b5cf6', '#10b981', '#eab308', '#06b6d4',
+      '#ec4899', '#14b8a6', '#f43f5e', '#6366f1', '#84cc16',
+      '#d97706', '#a855f7', '#059669', '#0284c7', '#e11d48'
+    ]
+  },
+  vivos: {
+    nombre: '⚡ Colores Vivos / Vibrantes',
+    colores: [
+      '#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#9333ea',
+      '#0891b2', '#ea580c', '#db2777', '#4f46e5', '#65a30d',
+      '#0284c7', '#b91c1c', '#15803d', '#a16207', '#7e22ce'
+    ]
+  },
+  pasteles: {
+    nombre: '🌸 Colores Pasteles Suaves',
+    colores: [
+      '#93c5fd', '#86efac', '#fda4af', '#d8b4fe', '#fdba74',
+      '#5eead4', '#f9a8d4', '#fde047', '#a5b4fc', '#cbd5e1',
+      '#bef264', '#67e8f9', '#fca5a5', '#c4b5fd', '#fed7aa'
+    ]
+  },
+  acofi_institucional: {
+    nombre: '🏛️ Institucional ACOFI & Académico',
+    colores: [
+      '#1e3a8a', '#0284c7', '#0d9488', '#d97706', '#475569',
+      '#2563eb', '#0369a1', '#0f766e', '#b45309', '#64748b',
+      '#1d4ed8', '#38bdf8', '#2dd4bf', '#f59e0b', '#94a3b8'
+    ]
+  },
+  oceano: {
+    nombre: '🌊 Océano y Esmeralda',
+    colores: [
+      '#0f172a', '#1e40af', '#0369a1', '#0891b2', '#0d9488',
+      '#059669', '#10b981', '#34d399', '#38bdf8', '#60a5fa',
+      '#818cf8', '#2dd4bf', '#22d3ee', '#93c5fd', '#a7f3d0'
+    ]
+  },
+  atardecer: {
+    nombre: '🌅 Atardecer Cálido (Terracota & Oro)',
+    colores: [
+      '#9a3412', '#c2410c', '#ea580c', '#f97316', '#f59e0b',
+      '#eab308', '#dc2626', '#e11d48', '#be185d', '#9d174d',
+      '#b45309', '#d97706', '#fb923c', '#fbbf24', '#f43f5e'
+    ]
+  },
+  bosque: {
+    nombre: '🌿 Bosque y Naturaleza',
+    colores: [
+      '#14532d', '#166534', '#15803d', '#16a34a', '#22c55e',
+      '#4d7c0f', '#65a30d', '#84cc16', '#0f766e', '#0d9488',
+      '#a16207', '#ca8a04', '#10b981', '#34d399', '#86efac'
+    ]
+  },
+  monocromatico: {
+    nombre: '🖤 Ejecutivo Sobrio (Grises & Azul Acero)',
+    colores: [
+      '#0f172a', '#1e293b', '#334155', '#475569', '#64748b',
+      '#1e3a8a', '#1d4ed8', '#3b82f6', '#94a3b8', '#cbd5e1',
+      '#27272a', '#52525b', '#71717a', '#a1a1aa', '#d4d4d8'
+    ]
+  }
 };
 
 const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
@@ -132,7 +200,30 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
     min-height: 1.5em;
     line-height: 1.5 !important;
   }
-  /* Clases dedicadas para imágenes personalizadas dentro del texto */
+  /* Soporte completo de viñetas y numeraciones de Quill v2 */
+  .prose ul {
+    list-style-type: disc !important;
+    padding-left: 1.75rem !important;
+    margin: 0.5rem 0 !important;
+  }
+  .prose ol {
+    list-style-type: decimal !important;
+    padding-left: 1.75rem !important;
+    margin: 0.5rem 0 !important;
+  }
+  .prose li {
+    display: list-item !important;
+    margin-bottom: 0.25rem !important;
+  }
+  .prose li[data-list="bullet"] {
+    list-style-type: disc !important;
+  }
+  .prose li[data-list="ordered"] {
+    list-style-type: decimal !important;
+  }
+  .prose .ql-ui {
+    display: none !important;
+  }
   img[data-borde="cuadrado"], .ql-editor img[data-borde="cuadrado"] {
     border-radius: 0px !important;
   }
@@ -159,8 +250,8 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
   }
   @media print {
     @page {
-      size: A4 landscape;
-      margin: 10mm;
+      size: A4 portrait;
+      margin: 10mm 12mm;
     }
     html, body {
       height: auto !important;
@@ -180,18 +271,23 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
       overflow: visible !important;
     }
     .print-page-sheet {
-      page-break-after: always !important;
-      break-after: page !important;
-      min-height: 185mm !important;
+      page-break-before: always !important;
+      break-before: page !important;
       width: 100% !important;
-      padding: 12mm 14mm !important;
+      padding: 6mm 4mm !important;
       box-sizing: border-box !important;
       position: relative !important;
       overflow: visible !important;
     }
-    .print-page-sheet:last-child {
-      page-break-after: auto !important;
-      break-after: auto !important;
+    .print-page-sheet:first-child {
+      page-break-before: auto !important;
+      break-before: auto !important;
+    }
+    .print-header-keep {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     .print-avoid-break {
       page-break-inside: avoid !important;
@@ -210,7 +306,6 @@ const ReactQuill = dynamic(
         Font.whitelist = FUENTES_WORD;
         Quill.register(Font, true);
       }
-      // Permitir atributos personalizados en imágenes dentro de Quill (width, style, data-borde, data-alineacion)
       const BaseImage = Quill.import('formats/image') as any;
       if (BaseImage) {
         const ATTRIBUTES = ['alt', 'height', 'width', 'style', 'data-borde', 'data-alineacion'];
@@ -324,18 +419,25 @@ type BloqueGrafica = BloqueBase & {
   ejeX: number; 
   ejesY: number[]; 
   coloresCustom?: string[]; 
+  paletaNombre?: string;
   mostrarValores?: boolean; 
+  ocultarEjeX?: boolean;
+  ocultarLeyenda?: boolean;
+  alturaGrafica?: number;
   pieBloque?: string;
 };
 
 type BloqueImagen = BloqueBase & { tipo: 'imagen'; url: string; alt: string; pantallaCompleta: boolean; };
 
 type EstiloBoton = 'solido' | 'contorno' | 'pildora' | '3d' | '4d';
+type TamanoBoton = 'pequeno' | 'mediano' | 'grande' | 'extragrande';
 type BloqueBoton = BloqueBase & {
   tipo: 'boton';
   texto: string;
   url: string;
   estilo: EstiloBoton;
+  tamanoBoton?: TamanoBoton;
+  fuenteBoton?: string;
   colorBoton: string;
   colorTexto: string;
   colorIluminacion?: string;
@@ -361,6 +463,7 @@ type ConfiguracionEdicion = {
   subtitulo?: string;
   portadaContenido?: string;
   colorFondoPortada?: string;
+  colorFondoPaginasGlobal?: string;
   imagenFondoPortada?: string;
   logoUrl?: string;
   logoSize?: number;
@@ -396,6 +499,7 @@ export default function AdminPage() {
     modoMarcaAgua: 'todas', 
     paginasMarcaAgua: [],
     colorFondoPortada: '#fdfbf7',
+    colorFondoPaginasGlobal: '#fdfbf7',
     logoSize: 56,
     logoBrightness: 100,
     marcaAguaSize: 40,
@@ -418,13 +522,15 @@ export default function AdminPage() {
   
   const [tooltipMapa, setTooltipMapa] = useState<{ nombre: string; valor: string; x: number; y: number } | null>(null);
 
+  // GeoJSON de Colombia precargado en memoria para que siempre se renderice instantáneamente en los PDF
+  const [colombiaGeoJson, setColombiaGeoJson] = useState<any>(null);
+
   const [selectorColorActivo, setSelectorColorActivo] = useState<{
     bloqueId: string;
     indice: number;
     etiqueta: string;
   } | null>(null);
 
-  // Estado para capturar tanto el texto sombreado como la posición exacta del cursor dentro de un bloque de texto
   const [seleccionTextoActiva, setSeleccionTextoActiva] = useState<{
     bloqueId: string;
     columna: 1 | 2 | 3;
@@ -455,11 +561,8 @@ export default function AdminPage() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const COLORES_GRAFICAS_DEFAULT = [
-    '#93c5fd', '#86efac', '#fda4af', '#d8b4fe', '#fdba74',
-    '#5eead4', '#f9a8d4', '#fde047', '#a5b4fc', '#cbd5e1',
-    '#bef264', '#67e8f9', '#fca5a5', '#c4b5fd', '#fed7aa'
-  ];
+  // PALETA POR DEFECTO: COLORES SECUNDARIOS
+  const COLORES_GRAFICAS_DEFAULT = PALETAS_GRAFICAS.secundarios.colores;
 
   const quillModules = useMemo(() => ({
     toolbar: [
@@ -475,6 +578,13 @@ export default function AdminPage() {
   }), []);
 
   const generarId = () => Math.random().toString(36).substr(2, 9);
+
+  useEffect(() => {
+    fetch('/colombia.json')
+      .then(res => res.json())
+      .then(data => setColombiaGeoJson(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -524,6 +634,7 @@ export default function AdminPage() {
       modoMarcaAgua: 'todas', 
       paginasMarcaAgua: [],
       colorFondoPortada: '#fdfbf7',
+      colorFondoPaginasGlobal: '#fdfbf7',
       logoSize: 56,
       logoBrightness: 100,
       marcaAguaSize: 40,
@@ -634,6 +745,14 @@ export default function AdminPage() {
     }, 1500);
   };
 
+  // FUNCIÓN PARA CAMBIAR EL COLOR DE FONDO DE TODAS LAS PÁGINAS EXCEPTO LA PORTADA
+  const aplicarColorFondoATodasLasPaginas = (colorHex: string) => {
+    const nuevasPaginas = paginas.map(p => ({ ...p, colorFondo: colorHex }));
+    const nuevaConfig = { ...configuracion, colorFondoPaginasGlobal: colorHex };
+    autoGuardar(nuevasPaginas, nuevaConfig);
+    mostrarMensaje(`Color ${colorHex} aplicado a las ${nuevasPaginas.length} páginas del libro.`, 'exito');
+  };
+
   const descargarRespaldoJson = () => {
     if (!edicionActiva) return;
     try {
@@ -668,8 +787,8 @@ export default function AdminPage() {
       window.print();
       setTimeout(() => {
         setGenerandoPdfAdmin(false);
-      }, 800);
-    }, 1400);
+      }, 900);
+    }, 1800);
   };
   // FUNCIÓN DEL INYECTOR DE LOTES JSON INTELIGENTE
   const procesarInyeccionLoteJson = () => {
@@ -726,7 +845,7 @@ export default function AdminPage() {
           posicion: pag.posicion === 'antes_portada' ? 'antes_portada' : 'despues_portada',
           cabeceraHtml: pag.cabeceraHtml || '',
           piePaginaHtml: pag.piePaginaHtml || '',
-          colorFondo: pag.colorFondo || '#fdfbf7',
+          colorFondo: pag.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
           bloques: bloquesConNuevosIds
         };
       });
@@ -819,7 +938,11 @@ export default function AdminPage() {
               ejeX: Number(b.ejeX) || 0,
               ejesY: Array.isArray(b.ejesY) ? b.ejesY.map(Number) : [1],
               coloresCustom: Array.isArray(b.coloresCustom) ? b.coloresCustom : [],
+              paletaNombre: b.paletaNombre || 'secundarios',
               mostrarValores: b.mostrarValores !== false,
+              ocultarEjeX: !!b.ocultarEjeX,
+              ocultarLeyenda: !!b.ocultarLeyenda,
+              alturaGrafica: Number(b.alturaGrafica) || 380,
               colorFondo: b.colorFondo || '#ffffff',
               escala: Number(b.escala) || 100,
               pieBloque: b.pieBloque || ''
@@ -842,6 +965,8 @@ export default function AdminPage() {
               texto: String(b.texto || 'Ver más'),
               url: String(b.url || 'https://acofi.edu.co'),
               estilo: (b.estilo as EstiloBoton) || 'solido',
+              tamanoBoton: (b.tamanoBoton as TamanoBoton) || 'mediano',
+              fuenteBoton: b.fuenteBoton || 'arial',
               colorBoton: b.colorBoton || edicionActiva?.color_principal || '#1d4ed8',
               colorTexto: b.colorTexto || '#ffffff',
               colorIluminacion: b.colorIluminacion || '#60a5fa',
@@ -963,7 +1088,6 @@ export default function AdminPage() {
     }
   };
 
-  // Subida de imagen para firmas individuales dentro de un bloque de firma
   const manejarSubidaImagenFirma = async (e: React.ChangeEvent<HTMLInputElement>, bloqueId: string, firmaIdx: number) => {
     const file = e.target.files?.[0];
     if (!file || !edicionActiva) return;
@@ -995,7 +1119,6 @@ export default function AdminPage() {
     }
   };
 
-  // Eliminar únicamente la imagen de una firma conservando sus textos (Nombre, Cargo, Info adicional)
   const quitarSoloImagenFirma = (bloqueId: string, firmaIdx: number) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueFirma;
@@ -1006,7 +1129,6 @@ export default function AdminPage() {
     }
   };
 
-  // Subida e inyección directa de imagen dentro de un bloque de texto (en la posición del cursor o al final)
   const manejarSubidaImagenEnTexto = async (
     e: React.ChangeEvent<HTMLInputElement>,
     bloqueId: string,
@@ -1068,7 +1190,6 @@ export default function AdminPage() {
     const imgStyle = construirEstiloImagenTexto(anchoLimpio, alineacionImg, bordeImg);
     const htmlImg = `<p${claseAlignQuill}><img src="${urlImg}" alt="Imagen" width="${anchoLimpio}" data-borde="${bordeImg}" data-alineacion="${alineacionImg}" style="${imgStyle}" /></p>`;
 
-    // Si el usuario dejó el cursor en un punto específico del editor de este bloque, insertamos exactamente ahí
     if (
       ultimoRangoCursorRef.current &&
       ultimoRangoCursorRef.current.bloqueId === bloqueId &&
@@ -1093,7 +1214,7 @@ export default function AdminPage() {
           return;
         }
       } catch (e) {
-        // Fallback al método HTML si el rango expiró
+        // Fallback al método HTML
       }
     }
 
@@ -1107,7 +1228,6 @@ export default function AdminPage() {
     autoGuardar(nuevasPaginas);
   };
 
-  // EXTRAER LISTA DE IMÁGENES ACTUALES DENTRO DE UN BLOQUE DE TEXTO PARA PODER EDITARLAS, MOVERLAS O BORRARLAS INDIVIDUALMENTE
   const extraerImagenesDeColumnaTexto = (htmlColumna?: string) => {
     if (!htmlColumna || !htmlColumna.includes('<img')) return [];
     const regexImg = /<img\b[^>]*>/gi;
@@ -1137,7 +1257,6 @@ export default function AdminPage() {
     });
   };
 
-  // MODIFICAR PROPIEDADES (TAMAÑO, ALINEACIÓN, ESQUINAS REDONDAS/CUADRADAS) DE UNA IMAGEN ESPECÍFICA DENTRO DEL TEXTO
   const actualizarImagenEspecificaEnTexto = (
     bloqueId: string,
     columnaDestino: 1 | 2 | 3,
@@ -1170,7 +1289,6 @@ export default function AdminPage() {
     autoGuardar(nuevasPaginas);
   };
 
-  // MOVER UNA IMAGEN ARRIBA O ABAJO ENTRE LOS PÁRRAFOS DEL BLOQUE DE TEXTO
   const moverImagenEntreParrafosTexto = (
     bloqueId: string,
     columnaDestino: 1 | 2 | 3,
@@ -1191,14 +1309,12 @@ export default function AdminPage() {
     const imgTarget = todasLasImgs[indiceImg];
     if (!imgTarget) return;
 
-    // Encontrar el nodo de bloque superior (p, div, h1..h6, li) que contiene la imagen
     let bloquePadre: HTMLElement | null = imgTarget as HTMLElement;
     while (bloquePadre && bloquePadre.parentElement && bloquePadre.parentElement !== tempDiv) {
       bloquePadre = bloquePadre.parentElement;
     }
     if (!bloquePadre) return;
 
-    // Si el párrafo tiene texto además de la imagen, separamos la imagen en su propio párrafo para moverla libremente
     if ((bloquePadre.textContent || '').trim().length > 0) {
       const nuevoParrafoImg = document.createElement('p');
       nuevoParrafoImg.appendChild(imgTarget.cloneNode(true));
@@ -1228,7 +1344,6 @@ export default function AdminPage() {
     mostrarMensaje(direccion === 'arriba' ? 'Imagen subida un párrafo' : 'Imagen bajada un párrafo', 'exito');
   };
 
-  // ELIMINAR UNA IMAGEN ESPECÍFICA DENTRO DE UN BLOQUE DE TEXTO
   const eliminarImagenDeColumnaTexto = (bloqueId: string, columnaDestino: 1 | 2 | 3, indiceImg: number) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTexto;
@@ -1331,7 +1446,7 @@ export default function AdminPage() {
       mostrarNumero: true,
       posicion: 'despues_portada',
       bloques: [], 
-      colorFondo: '#fdfbf7' 
+      colorFondo: configuracion.colorFondoPaginasGlobal || '#fdfbf7' 
     };
     const nuevasPaginas = [...paginas];
     nuevasPaginas.splice(indicePaginaActual + 1, 0, nuevaPagina);
@@ -1459,6 +1574,8 @@ export default function AdminPage() {
       texto: 'Haz clic aquí',
       url: 'https://acofi.edu.co',
       estilo: '4d',
+      tamanoBoton: 'mediano',
+      fuenteBoton: 'arial',
       colorBoton: edicionActiva?.color_principal || '#1d4ed8',
       colorTexto: '#ffffff',
       colorIluminacion: '#60a5fa',
@@ -1531,8 +1648,12 @@ export default function AdminPage() {
       tipoGrafica: 'barras', 
       ejeX: 0, 
       ejesY: [], 
-      coloresCustom: [], 
+      coloresCustom: [...PALETAS_GRAFICAS.secundarios.colores], 
+      paletaNombre: 'secundarios',
       mostrarValores: false, 
+      ocultarEjeX: false,
+      ocultarLeyenda: false,
+      alturaGrafica: 380,
       colorFondo: '#ffffff',
       escala: 100,
       pieBloque: ''
@@ -1717,6 +1838,20 @@ export default function AdminPage() {
       (bloque as any)[campo] = valor;
       if (campo === 'tablaRef') { bloque.ejeX = 0; bloque.ejesY = []; }
       autoGuardar(nuevasPaginas);
+    }
+  };
+
+  // APLICAR UNA PALETA COMPLETA DE COLORES A UNA GRÁFICA EN 1 CLIC
+  const aplicarPaletaAGrafica = (bloqueId: string, clavePaleta: string) => {
+    const paleta = PALETAS_GRAFICAS[clavePaleta];
+    if (!paleta) return;
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueGrafica;
+    if (bloque && bloque.tipo === 'grafica') {
+      bloque.paletaNombre = clavePaleta;
+      bloque.coloresCustom = [...paleta.colores, ...paleta.colores, ...paleta.colores];
+      autoGuardar(nuevasPaginas);
+      mostrarMensaje(`Paleta "${paleta.nombre}" aplicada a la gráfica.`, 'exito');
     }
   };
 
@@ -1957,7 +2092,6 @@ export default function AdminPage() {
     const contenedor = e.currentTarget.querySelector('.ql-editor') as HTMLElement | null;
     if (!contenedor || !contenedor.contains(range.commonAncestorContainer)) return;
 
-    // Guardar siempre la última posición del cursor para poder insertar imágenes justo en medio del texto
     ultimoRangoCursorRef.current = {
       bloqueId,
       columna,
@@ -1981,7 +2115,7 @@ export default function AdminPage() {
     if (selectCol) selectCol.value = String(columna);
   };
 
-  // ENLAZAR EL TEXTO SELECCIONADO (O ESCRITO) CON PERSONALIZACIÓN DE COLOR Y SUBRAYADO (SÍ/NO)
+  // ENLAZAR EL TEXTO SELECCIONADO (O ESCRITO) CON PERSONALIZACIÓN COMPLETA: COLOR, NEGRITA, CURSIVA, SUBRAYADO Y TACHADO
   const enlazarTextoEnColumna = (
     bloqueId: string,
     columnaDestino: 1 | 2 | 3,
@@ -1989,7 +2123,10 @@ export default function AdminPage() {
     tipoDestino: 'pagina' | 'url',
     destinoValor: string,
     colorEnlace: string = '#1d4ed8',
-    conSubrayado: boolean = true
+    conSubrayado: boolean = true,
+    conNegrita: boolean = true,
+    conTachado: boolean = false,
+    conCursiva: boolean = false
   ) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTexto;
@@ -2003,8 +2140,15 @@ export default function AdminPage() {
     const htmlActual = String((bloque as any)[campo] || '');
 
     const hrefFinal = tipoDestino === 'pagina' ? `#pagina:${destinoValor}` : (destinoValor.trim() || 'https://acofi.edu.co');
-    const decoStyle = conSubrayado ? 'underline' : 'none';
-    const estiloLink = `color: ${colorEnlace} !important; text-decoration: ${decoStyle} !important; font-weight: 700; cursor: pointer;`;
+    
+    const decoraciones: string[] = [];
+    if (conSubrayado) decoraciones.push('underline');
+    if (conTachado) decoraciones.push('line-through');
+    const decoStyle = decoraciones.length > 0 ? decoraciones.join(' ') : 'none';
+    const weightStyle = conNegrita ? '700' : '400';
+    const italicStyle = conCursiva ? 'italic' : 'normal';
+
+    const estiloLink = `color: ${colorEnlace} !important; text-decoration: ${decoStyle} !important; font-weight: ${weightStyle} !important; font-style: ${italicStyle} !important; cursor: pointer;`;
 
     if (
       seleccionTextoActiva &&
@@ -2075,6 +2219,20 @@ export default function AdminPage() {
       return <BarChart3 size={14} />;
     }
     return null;
+  };
+
+  const obtenerEstilosTamanoBoton = (tamano?: TamanoBoton) => {
+    switch (tamano) {
+      case 'pequeno':
+        return { padding: '8px 18px', fontSize: '11px' };
+      case 'grande':
+        return { padding: '16px 38px', fontSize: '15px' };
+      case 'extragrande':
+        return { padding: '20px 48px', fontSize: '18px' };
+      case 'mediano':
+      default:
+        return { padding: '13px 28px', fontSize: '13px' };
+    }
   };
 
   const RenderUploadConfig = ({ campo, label, placeholder }: { campo: keyof ConfiguracionEdicion, label: string, placeholder: string }) => (
@@ -2222,6 +2380,13 @@ export default function AdminPage() {
   const esGraficaPorSegmento = (tipo: TipoGrafica) =>
     ['torta', 'torta_rellena', 'torta_3d_rellena', 'rosa_polar', 'dona', 'torta_4d', 'semicirculo', 'barras_radiales', 'embudo', 'treemap'].includes(tipo);
 
+  const obtenerPaletaActivaBloque = (bloqueGrafica: BloqueGrafica) => {
+    if (bloqueGrafica.paletaNombre && PALETAS_GRAFICAS[bloqueGrafica.paletaNombre]) {
+      return PALETAS_GRAFICAS[bloqueGrafica.paletaNombre].colores;
+    }
+    return COLORES_GRAFICAS_DEFAULT;
+  };
+
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = todasLasTablasAdmin.find(t => t.id === bloqueGrafica.tablaRef);
     if (!tablaFuente || !tablaFuente.data || tablaFuente.data.length < 2) return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
@@ -2250,6 +2415,8 @@ export default function AdminPage() {
       }
     });
 
+    const paletaBase = obtenerPaletaActivaBloque(bloqueGrafica);
+
     const datosFormateados = filas.map((fila, fIdx) => {
       const rawVal = String(fila[indiceMapa] || '');
       const nombreCabMapa = cabeceras[indiceMapa] || '';
@@ -2260,7 +2427,7 @@ export default function AdminPage() {
           valorMapa: parseValor(fila[indiceMapa]),
           esPorcentaje: esPorcMapa,
           _idx: fIdx,
-          fill: bloqueGrafica.coloresCustom?.[fIdx] || COLORES_GRAFICAS_DEFAULT[fIdx % COLORES_GRAFICAS_DEFAULT.length]
+          fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
       };
       ejesYUsar.forEach(idx => {
         const nombreCabecera = cabeceras[idx];
@@ -2280,6 +2447,9 @@ export default function AdminPage() {
     const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]);
     const nombreY = nombresEjesY[0];
     const unicaSerie = nombresEjesY.length === 1;
+    const paletaActiva = obtenerPaletaActivaBloque(bloque);
+    const altoContenedor = Number(bloque.alturaGrafica) || 380;
+    const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
     const formatearEtiqueta = (v: any, nombreSerie?: string) => {
       const num = Number(v);
@@ -2295,18 +2465,18 @@ export default function AdminPage() {
     switch (bloque.tipoGrafica) {
       case 'barras':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
                   dataKey={nombre} 
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={[6, 6, 0, 0]} 
                   isAnimationActive={false}
                   style={{ cursor: 'pointer' }}
@@ -2315,7 +2485,7 @@ export default function AdminPage() {
                   {unicaSerie && datos.map((entry: any, idx: number) => (
                     <Cell 
                       key={`cell-bar-${idx}`} 
-                      fill={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
+                      fill={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} 
                       cursor="pointer"
                       onClick={() => abrirSelectorDirecto(idx, entry.name)}
                     />
@@ -2329,18 +2499,18 @@ export default function AdminPage() {
 
       case 'barras_horizontales':
         return (
-          <ResponsiveContainer width="100%" height={360}>
-            <BarChart layout="vertical" data={datos} margin={{ top: 20, right: 55, left: 40, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
+            <BarChart layout="vertical" data={datos} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
               <XAxis type="number" domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
+              <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
                   dataKey={nombre} 
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={[0, 6, 6, 0]} 
                   isAnimationActive={false}
                   style={{ cursor: 'pointer' }}
@@ -2349,7 +2519,7 @@ export default function AdminPage() {
                   {unicaSerie && datos.map((entry: any, idx: number) => (
                     <Cell 
                       key={`cell-hbar-${idx}`} 
-                      fill={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
+                      fill={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} 
                       cursor="pointer"
                       onClick={() => abrirSelectorDirecto(idx, entry.name)}
                     />
@@ -2364,7 +2534,7 @@ export default function AdminPage() {
       case 'barras_apiladas':
       case 'barras_3d_apiladas':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadowStack-admin-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
@@ -2372,22 +2542,22 @@ export default function AdminPage() {
                 </filter>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
                   dataKey={nombre} 
                   stackId="a" 
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={i === nombresEjesY.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]} 
                   style={bloque.tipoGrafica === 'barras_3d_apiladas' ? { filter: `url(#shadowStack-admin-${bloque.id})`, cursor: 'pointer' } : { cursor: 'pointer' }}
                   onClick={() => abrirSelectorDirecto(i, nombre)}
                   isAnimationActive={false}
                 >
-                  {bloque.mostrarValores && <LabelList dataKey={nombre} position="inside" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#1e293b', fontSize: 11, fontWeight: 'bold' }} />}
+                  {bloque.mostrarValores && <LabelList dataKey={nombre} position="inside" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#ffffff', fontSize: 11, fontWeight: 'bold' }} />}
                 </Bar>
               ))}
             </BarChart>
@@ -2396,7 +2566,7 @@ export default function AdminPage() {
 
       case 'barras_4d':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart data={datos} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadow4d-admin-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
@@ -2404,12 +2574,12 @@ export default function AdminPage() {
                 </filter>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
-                const baseColor = bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length];
+                const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 return (
                   <Bar 
                     key={nombre} 
@@ -2423,7 +2593,7 @@ export default function AdminPage() {
                     {unicaSerie && datos.map((entry: any, idx: number) => (
                       <Cell 
                         key={`cell-4dbar-${idx}`} 
-                        fill={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
+                        fill={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} 
                         cursor="pointer"
                         onClick={() => abrirSelectorDirecto(idx, entry.name)}
                       />
@@ -2441,7 +2611,7 @@ export default function AdminPage() {
       case 'dona':
       case 'semicirculo':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <PieChart>
               <Pie 
                 data={datos} 
@@ -2449,18 +2619,18 @@ export default function AdminPage() {
                 cy={bloque.tipoGrafica === 'semicirculo' ? '72%' : '50%'} 
                 startAngle={bloque.tipoGrafica === 'semicirculo' ? 180 : 0}
                 endAngle={bloque.tipoGrafica === 'semicirculo' ? 0 : 360}
-                innerRadius={bloque.tipoGrafica === 'dona' ? 80 : (bloque.tipoGrafica === 'semicirculo' ? 65 : 0)} 
-                outerRadius={125} 
+                innerRadius={bloque.tipoGrafica === 'dona' ? Math.round(radioPastel * 0.62) : (bloque.tipoGrafica === 'semicirculo' ? Math.round(radioPastel * 0.5) : 0)} 
+                outerRadius={radioPastel} 
                 paddingAngle={bloque.tipoGrafica === 'dona' || bloque.tipoGrafica === 'semicirculo' ? 3 : (bloque.tipoGrafica === 'torta_rellena' ? 0 : 1)} 
                 dataKey={nombreY} 
                 nameKey="name" 
-                label={bloque.mostrarValores ? ({ name, value }) => `${name}: ${formatearEtiqueta(value, nombreY)}` : false}
+                label={bloque.mostrarValores ? ({ name, value }) => `${bloque.ocultarEjeX ? '' : `${name}: `}${formatearEtiqueta(value, nombreY)}` : false}
                 isAnimationActive={false}
               >
                 {datos.map((entry: any, i: number) => (
                   <Cell 
                     key={`cell-${i}`} 
-                    fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                    fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                     stroke={bloque.tipoGrafica === 'torta_rellena' ? '#ffffff' : 'none'}
                     strokeWidth={bloque.tipoGrafica === 'torta_rellena' ? 1.5 : 0}
                     style={{ cursor: 'pointer' }}
@@ -2469,7 +2639,7 @@ export default function AdminPage() {
                 ))}
               </Pie>
               <RechartsTooltip formatter={(value: any) => formatearEtiqueta(value, nombreY)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend verticalAlign="bottom" height={36} />
+              {!bloque.ocultarLeyenda && !bloque.ocultarEjeX && <Legend verticalAlign="bottom" height={36} />}
             </PieChart>
           </ResponsiveContainer>
         );
@@ -2478,22 +2648,22 @@ export default function AdminPage() {
         const maxValRosa = Math.max(...datos.map((d: any) => Number(d[nombreY]) || 0), 1);
         const datosIguales = datos.map((d: any) => ({ ...d, _anguloIgual: 1, _valorReal: Number(d[nombreY]) || 0 }));
         return (
-          <ResponsiveContainer width="100%" height={380}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <PieChart>
               <Pie
                 data={datosIguales}
                 cx="50%"
                 cy="50%"
                 innerRadius={0}
-                outerRadius={130}
+                outerRadius={radioPastel}
                 dataKey="_anguloIgual"
                 nameKey="name"
                 isAnimationActive={false}
-                label={bloque.mostrarValores ? ({ payload }: any) => `${payload.name}: ${formatearEtiqueta(payload._valorReal, nombreY)}` : false}
+                label={bloque.mostrarValores ? ({ payload }: any) => `${bloque.ocultarEjeX ? '' : `${payload.name}: `}${formatearEtiqueta(payload._valorReal, nombreY)}` : false}
                 shape={(props: any) => {
                   const { cx, cy, startAngle, endAngle, fill, payload, index } = props;
                   const val = Number(payload._valorReal) || 0;
-                  const r = 22 + (val / maxValRosa) * 108;
+                  const r = 22 + (val / maxValRosa) * (radioPastel - 22);
                   return (
                     <Sector
                       cx={cx}
@@ -2512,11 +2682,11 @@ export default function AdminPage() {
                 }}
               >
                 {datosIguales.map((_, i) => (
-                  <Cell key={`cell-rosa-${i}`} fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} />
+                  <Cell key={`cell-rosa-${i}`} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} />
                 ))}
               </Pie>
               <RechartsTooltip formatter={(_: any, __: any, item: any) => [formatearEtiqueta(item?.payload?._valorReal, nombreY), item?.payload?.name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend verticalAlign="bottom" height={36} />
+              {!bloque.ocultarLeyenda && !bloque.ocultarEjeX && <Legend verticalAlign="bottom" height={36} />}
             </PieChart>
           </ResponsiveContainer>
         );
@@ -2526,7 +2696,7 @@ export default function AdminPage() {
       case 'torta_4d': {
         const sinHueco = bloque.tipoGrafica === 'torta_3d_rellena';
         return (
-          <div className="relative w-full flex flex-col items-center justify-center" style={{ height: 380 }}>
+          <div className="relative w-full flex flex-col items-center justify-center" style={{ height: altoContenedor }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <defs>
@@ -2534,13 +2704,12 @@ export default function AdminPage() {
                     <feDropShadow dx="0" dy="14" stdDeviation="8" floodColor="#0f172a" floodOpacity="0.35" />
                   </filter>
                 </defs>
-                {/* Capa de profundidad 3D: legendType="none" y tooltipType="none" evitan duplicados en la leyenda */}
                 <Pie 
                   data={datos} 
                   cx="50%" 
                   cy="55%" 
-                  innerRadius={sinHueco ? 0 : 55} 
-                  outerRadius={125} 
+                  innerRadius={sinHueco ? 0 : Math.round(radioPastel * 0.44)} 
+                  outerRadius={radioPastel} 
                   paddingAngle={sinHueco ? 0 : 4} 
                   dataKey={nombreY} 
                   isAnimationActive={false}
@@ -2548,35 +2717,35 @@ export default function AdminPage() {
                   tooltipType="none"
                 >
                   {datos.map((_, i) => (
-                    <Cell key={`depth-${i}`} fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} style={{ filter: 'brightness(0.62)' }} stroke="none" />
+                    <Cell key={`depth-${i}`} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} style={{ filter: 'brightness(0.62)' }} stroke="none" />
                   ))}
                 </Pie>
                 <Pie 
                   data={datos} 
                   cx="50%" 
                   cy="47%" 
-                  innerRadius={sinHueco ? 0 : 55} 
-                  outerRadius={125} 
+                  innerRadius={sinHueco ? 0 : Math.round(radioPastel * 0.44)} 
+                  outerRadius={radioPastel} 
                   paddingAngle={sinHueco ? 0 : 4} 
                   dataKey={nombreY} 
                   nameKey="name" 
                   stroke="#ffffff" 
                   strokeWidth={2}
                   style={{ filter: `url(#pie4d-admin-${bloque.id})` }}
-                  label={bloque.mostrarValores ? ({ name, value }) => `${name} (${formatearEtiqueta(value, nombreY)})` : false}
+                  label={bloque.mostrarValores ? ({ name, value }) => `${bloque.ocultarEjeX ? '' : `${name} `}(${formatearEtiqueta(value, nombreY)})` : false}
                   isAnimationActive={false}
                 >
                   {datos.map((entry: any, i: number) => (
                     <Cell 
                       key={`cell-4d-${i}`} 
-                      fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                      fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                       style={{ cursor: 'pointer' }}
                       onClick={() => abrirSelectorDirecto(i, entry.name)}
                     />
                   ))}
                 </Pie>
                 <RechartsTooltip formatter={(value: any) => formatearEtiqueta(value, nombreY)} contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.2)' }} />
-                <Legend verticalAlign="bottom" height={36} />
+                {!bloque.ocultarLeyenda && !bloque.ocultarEjeX && <Legend verticalAlign="bottom" height={36} />}
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -2585,7 +2754,7 @@ export default function AdminPage() {
 
       case 'barras_radiales':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="95%" barSize={22} data={datos}>
               <RadialBar 
                 background 
@@ -2597,14 +2766,14 @@ export default function AdminPage() {
                 {bloque.mostrarValores && <LabelList position="insideStart" fill="#1e293b" fontSize={11} fontWeight="bold" formatter={(v: any) => formatearEtiqueta(v, nombreY)} />}
               </RadialBar>
               <RechartsTooltip formatter={(value: any) => formatearEtiqueta(value, nombreY)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend iconSize={10} layout="vertical" verticalAlign="middle" wrapperStyle={{ right: 0 }} />
+              {!bloque.ocultarLeyenda && !bloque.ocultarEjeX && <Legend iconSize={10} layout="vertical" verticalAlign="middle" wrapperStyle={{ right: 0 }} />}
             </RadialBarChart>
           </ResponsiveContainer>
         );
 
       case 'embudo':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <FunnelChart>
               <RechartsTooltip formatter={(value: any) => formatearEtiqueta(value, nombreY)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Funnel 
@@ -2613,7 +2782,7 @@ export default function AdminPage() {
                 isAnimationActive={false}
                 onClick={(data: any, idx: number) => abrirSelectorDirecto(idx, data?.name || `Ítem ${idx + 1}`)}
               >
-                <LabelList position="right" fill="#292524" stroke="none" dataKey="name" style={{ fontSize: 12, fontWeight: 'bold' }} />
+                {!bloque.ocultarEjeX && <LabelList position="right" fill="#292524" stroke="none" dataKey="name" style={{ fontSize: 12, fontWeight: 'bold' }} />}
                 {bloque.mostrarValores && <LabelList position="center" fill="#1e293b" stroke="none" dataKey={nombreY} formatter={(v: any) => formatearEtiqueta(v, nombreY)} style={{ fontSize: 12, fontWeight: 900 }} />}
               </Funnel>
             </FunnelChart>
@@ -2622,7 +2791,7 @@ export default function AdminPage() {
 
       case 'treemap':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <Treemap
               data={datos}
               dataKey={nombreY}
@@ -2630,7 +2799,7 @@ export default function AdminPage() {
               aspectRatio={4 / 3}
               stroke="#ffffff"
               isAnimationActive={false}
-              fill={edicionActiva?.color_principal || '#93c5fd'}
+              fill={edicionActiva?.color_principal || '#f97316'}
               onClick={(node: any) => {
                 const idx = typeof node?._idx === 'number' ? node._idx : (typeof node?.index === 'number' ? node.index : 0);
                 abrirSelectorDirecto(idx, node?.name || `Ítem ${idx + 1}`);
@@ -2643,20 +2812,20 @@ export default function AdminPage() {
 
       case 'dispersion':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-              <XAxis type="category" dataKey="name" name="Categoría" tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis type="number" dataKey={nombreY} name={nombreY} domain={[0, 'auto']} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter 
                   key={nombre} 
                   name={nombre} 
                   data={datos} 
                   isAnimationActive={false}
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]}
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]}
                   onClick={() => abrirSelectorDirecto(i, nombre)}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -2669,19 +2838,19 @@ export default function AdminPage() {
       case 'lineas':
       case 'lineas_curvas':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line 
                   type={bloque.tipoGrafica === 'lineas_curvas' ? 'natural' : 'linear'} 
                   key={nombre} 
                   dataKey={nombre} 
-                  stroke={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   strokeWidth={3.5} 
                   dot={{ r: 4, strokeWidth: 2 }} 
                   activeDot={{ r: 6, onClick: () => abrirSelectorDirecto(i, nombre) }} 
@@ -2698,21 +2867,21 @@ export default function AdminPage() {
       case 'area':
       case 'area_apilada':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area 
                   type="monotone" 
                   key={nombre} 
                   dataKey={nombre} 
                   stackId={bloque.tipoGrafica === 'area_apilada' ? '1' : undefined} 
-                  stroke={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   fillOpacity={0.65} 
                   onClick={() => abrirSelectorDirecto(i, nombre)}
                   isAnimationActive={false}
@@ -2726,15 +2895,15 @@ export default function AdminPage() {
 
       case 'combinada':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <ComposedChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+              <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
-                const color = bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length];
+                const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 if (i === nombresEjesY.length - 1 && nombresEjesY.length > 1) {
                   return (
                     <Line key={nombre} type="monotone" dataKey={nombre} stroke={color} strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre)}>
@@ -2755,21 +2924,21 @@ export default function AdminPage() {
       case 'radar':
       case 'radar_relleno':
         return (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={altoContenedor}>
             <RadarChart cx="50%" cy="50%" outerRadius="78%" data={datos}>
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#cbd5e1" />
-              <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />
+              {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
               <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fill: '#94a3b8', fontSize: 10 }} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar 
                   key={nombre} 
                   name={nombre} 
                   dataKey={nombre} 
-                  stroke={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   strokeWidth={2.5} 
-                  fill={bloque.coloresCustom?.[i] || COLORES_GRAFICAS_DEFAULT[i % COLORES_GRAFICAS_DEFAULT.length]} 
+                  fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   fillOpacity={bloque.tipoGrafica === 'radar_relleno' ? 0.75 : 0.45} 
                   onClick={() => abrirSelectorDirecto(i, nombre)}
                   isAnimationActive={false}
@@ -2783,7 +2952,7 @@ export default function AdminPage() {
 
       case 'mapa_colombia':
         const valorMaximo = Math.max(...datos.map((d: any) => Number(d.valorMapa) || 0), 1);
-        const colorMapa = bloque.coloresCustom?.[0] || edicionActiva?.color_principal || "#93c5fd";
+        const colorMapa = bloque.coloresCustom?.[0] || edicionActiva?.color_principal || "#f97316";
         const escalaColor = scaleLinear<string>().domain([0, valorMaximo]).range(["#f1f5f9", colorMapa]); 
         
         const estiloMapa: any = {
@@ -2793,7 +2962,7 @@ export default function AdminPage() {
         };
 
         return (
-          <div className="w-full relative flex flex-col md:flex-row items-center rounded-2xl border border-stone-200 overflow-hidden bg-transparent" style={{ minHeight: '400px' }}>
+          <div className="w-full relative flex flex-col md:flex-row items-center rounded-2xl border border-stone-200 overflow-hidden bg-transparent" style={{ minHeight: `${altoContenedor}px` }}>
             {tooltipMapa && (
               <div 
                 className="fixed z-9999 pointer-events-none bg-slate-900/95 text-white px-3.5 py-2 rounded-xl shadow-xl border border-slate-700 text-xs font-sans transform -translate-x-1/2 -translate-y-full -mt-3 transition-opacity duration-75"
@@ -2803,10 +2972,10 @@ export default function AdminPage() {
                 <span className="block text-sm font-black text-amber-300">{nombreY || 'Valor'}: {tooltipMapa.valor}</span>
               </div>
             )}
-            <div className="w-full" style={{ height: '400px' }}>
-              <ComposableMap projection="geoMercator" projectionConfig={{ scale: 1800, center: [-74, 4.5] }} className="w-full h-full bg-transparent">
+            <div className="w-full" style={{ height: `${altoContenedor}px` }}>
+              <ComposableMap width={800} height={600} projection="geoMercator" projectionConfig={{ scale: 1800, center: [-74, 4.5] }} className="w-full h-full bg-transparent">
                 <ZoomableGroup center={[-74, 4.5]} zoom={1} maxZoom={5}>
-                  <Geographies geography="/colombia.json">
+                  <Geographies geography={colombiaGeoJson || "/colombia.json"}>
                     {({ geographies }) =>
                       geographies.map((geo) => {
                         const nombreOriginal = geo.properties?.name || "";
@@ -2859,7 +3028,8 @@ export default function AdminPage() {
         return null;
     }
   };
-  // RENDERIZADOR INFALIBLE DE BOTONES INLINE DENTRO DEL TEXTO (SOPORTA SOLIDO, PILDORA, CONTORNO, 3D Y 4D)
+
+  // RENDERIZADOR INFALIBLE DE BOTONES INLINE CON SOPORTE DE TAMAÑO Y TIPO DE LETRA
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
     const htmlSinNbsp = html.replace(/&nbsp;|&#160;|\u00A0/gi, ' ');
@@ -2881,6 +3051,8 @@ export default function AdminPage() {
       let cFondo = '#1d4ed8';
       let cTexto = '#ffffff';
       let cGlow = '';
+      let tamanoRaw = 'mediano';
+      let fuenteRaw = 'arial';
 
       if (partes.length === 3 && partes[2].startsWith('#')) {
         cFondo = partes[2];
@@ -2892,7 +3064,17 @@ export default function AdminPage() {
         cFondo = partes[3] || '#1d4ed8';
         cTexto = partes[4] || '#ffffff';
         cGlow = partes[5] || cFondo;
+        tamanoRaw = (partes[6] || 'mediano').toLowerCase();
+        fuenteRaw = partes[7] || 'arial';
       }
+
+      let padBtn = '9px 22px';
+      let fontBtn = '12px';
+      if (tamanoRaw === 'pequeno') { padBtn = '6px 14px'; fontBtn = '10px'; }
+      else if (tamanoRaw === 'grande') { padBtn = '13px 30px'; fontBtn = '14px'; }
+      else if (tamanoRaw === 'extragrande') { padBtn = '16px 38px'; fontBtn = '16px'; }
+
+      const fontFamilyCss = NOMBRES_FUENTES_WORD[fuenteRaw]?.family || 'sans-serif';
 
       let extraStyle = `background-color: ${cFondo} !important; color: ${cTexto} !important; border: 2px solid ${cFondo} !important; border-radius: 12px !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15) !important;`;
 
@@ -2910,7 +3092,7 @@ export default function AdminPage() {
       const esLinkInterno = url.startsWith('#pagina:') || (!url.startsWith('http') && url.startsWith('#'));
       const targetAttr = esLinkInterno ? '' : 'target="_blank" rel="noreferrer"';
 
-      return `<a href="${url}" ${targetAttr} data-inline-btn="true" style="${extraStyle} padding: 9px 22px !important; font-family: sans-serif !important; font-weight: 900 !important; font-size: 12px !important; line-height: 1.2 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; text-decoration: none !important; display: inline-block !important; margin: 6px 6px !important; vertical-align: middle !important; cursor: pointer !important; transition: transform 0.2s ease, filter 0.2s ease !important;">${texto}</a>`;
+      return `<a href="${url}" ${targetAttr} data-inline-btn="true" style="${extraStyle} padding: ${padBtn} !important; font-family: ${fontFamilyCss} !important; font-weight: 900 !important; font-size: ${fontBtn} !important; line-height: 1.2 !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; text-decoration: none !important; display: inline-block !important; margin: 6px 6px !important; vertical-align: middle !important; cursor: pointer !important; transition: transform 0.2s ease, filter 0.2s ease !important;">${texto}</a>`;
     });
   };
 
@@ -2993,13 +3175,13 @@ export default function AdminPage() {
         </aside>
       )}
 
-      {/* VISTA DE IMPRESIÓN / EXPORTACIÓN PDF OFICIAL DESDE EL ADMIN (FLUJO NATIVO PARA QUE IMPRIMA LAS 120 PÁGINAS IDÉNTICAS AL LIBRO) */}
+      {/* VISTA DE IMPRESIÓN / EXPORTACIÓN PDF OFICIAL DESDE EL ADMIN */}
       {generandoPdfAdmin && (
         <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
           <div className="max-w-5xl mx-auto">
             
             {/* Portada en PDF */}
-            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
+            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10 py-24" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
               {configuracion.logoUrl && (
                 <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
               )}
@@ -3013,7 +3195,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Todas las Páginas del Libro en PDF */}
+            {/* Todas las Páginas del Libro en PDF (sin títulos huérfanos y con mapas completos) */}
             {paginas.map((p, pIdx) => {
               const tieneT = p.titulo.trim() !== '';
               const tieneSub = (p.subtitulo || '').trim() !== '';
@@ -3028,10 +3210,10 @@ export default function AdminPage() {
               return (
                 <div key={p.id} className="print-page-sheet flex flex-col" style={{ backgroundColor: p.colorFondo || '#fdfbf7' }}>
                   {cabeceraMostrar && (
-                    <div className="mb-6 pb-3 border-b border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }} />
+                    <div className="mb-4 pb-2 border-b border-stone-200 text-xs opacity-75 print-header-keep" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }} />
                   )}
                   {(tieneT || tieneSub) && (
-                    <div className="mb-8 border-b border-stone-200 pb-4 print-avoid-break">
+                    <div className="mb-6 border-b border-stone-200 pb-4 print-header-keep">
                       <div className="flex items-center gap-4">
                         {mostrarNum && <span className="text-4xl font-black opacity-30">{pIdx + 1}.</span>}
                         {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
@@ -3039,9 +3221,9 @@ export default function AdminPage() {
                       {tieneSub && <p className="text-base text-stone-500 font-serif italic mt-2">{p.subtitulo}</p>}
                     </div>
                   )}
-                  <div className="space-y-8 flex-1">
+                  <div className="space-y-6 flex-1">
                     {p.bloques.map((b) => (
-                      <div key={b.id} className="w-full print-avoid-break">
+                      <div key={b.id} className={`w-full ${b.tipo === 'grafica' || b.tipo === 'firma' || b.tipo === 'imagen' ? 'print-avoid-break' : ''}`}>
                         {b.tipo === 'texto' && (
                           b.columnas === 2 || b.columnas === 3 ? (
                             <div 
@@ -3062,7 +3244,7 @@ export default function AdminPage() {
                         )}
                         {b.tipo === 'firma' && (
                           <div 
-                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-10 items-end ${
+                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-10 items-start ${
                               b.alineacion === 'centro' ? 'justify-center text-center' :
                               b.alineacion === 'derecha' ? 'justify-end text-right' :
                               b.alineacion === 'espaciado' ? 'justify-around text-left' :
@@ -3070,15 +3252,15 @@ export default function AdminPage() {
                             }`}
                             style={{ 
                               backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
-                              paddingTop: `${(b.espacioGeneralSuperior ?? 0) + 16}px`,
-                              paddingBottom: `${(b.espacioGeneralInferior ?? 0) + 16}px`
+                              paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
+                              paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
                             }}
                           >
                             {(b.firmas || []).map((f, i) => (
                               <div 
                                 key={i} 
                                 className="flex flex-col space-y-1 min-w-52"
-                                style={{ marginTop: `${f.espacioSuperior || 0}px` }}
+                                style={{ transform: `translateY(${f.espacioSuperior ?? 0}px)` }}
                               >
                                 {f.url && (
                                   <img 
@@ -3095,25 +3277,32 @@ export default function AdminPage() {
                             ))}
                           </div>
                         )}
-                        {b.tipo === 'boton' && (
-                          <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                            <span
-                              style={{
-                                backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
-                                color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
-                                borderColor: b.colorBoton,
-                                boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
-                              }}
-                              className={`px-6 py-2.5 font-sans font-black text-xs uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
-                            >
-                              {b.texto}
-                            </span>
-                          </div>
-                        )}
+                        {b.tipo === 'boton' && (() => {
+                          const szBtn = obtenerEstilosTamanoBoton(b.tamanoBoton);
+                          const famBtn = NOMBRES_FUENTES_WORD[b.fuenteBoton || 'arial']?.family || 'sans-serif';
+                          return (
+                            <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                              <span
+                                style={{
+                                  backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
+                                  color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
+                                  borderColor: b.colorBoton,
+                                  padding: szBtn.padding,
+                                  fontSize: szBtn.fontSize,
+                                  fontFamily: famBtn,
+                                  boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
+                                }}
+                                className={`font-black uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
+                              >
+                                {b.texto}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {b.tipo === 'tabla' && !b.oculto && (
-                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
-                            <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase">{b.nombre}</div>
-                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 13}px` }}>
+                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-3" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                            <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase print-header-keep">{b.nombre}</div>
+                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 12}px` }}>
                               <thead>
                                 <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
                                   {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
@@ -3122,7 +3311,7 @@ export default function AdminPage() {
                               <tbody className="divide-y divide-stone-200">
                                 {b.data.slice(1).map((f, fi) => (
                                   <tr key={fi} style={{ backgroundColor: b.coloresFilas?.[fi + 1] || 'transparent' }}>
-                                    {f.map((cell, cii) => <td key={cii} className={`p-2 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
+                                    {f.map((cell, cii) => <td key={cii} className={`p-1.5 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
                                   </tr>
                                 ))}
                               </tbody>
@@ -3131,14 +3320,14 @@ export default function AdminPage() {
                           </div>
                         )}
                         {b.tipo === 'grafica' && (
-                          <div className="border border-stone-200 rounded-2xl p-6 my-4" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                          <div className="border border-stone-200 rounded-2xl p-6 my-4 print-avoid-break" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
                             <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
                             {renderizarGrafica(b)}
                             {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
                           </div>
                         )}
                         {b.tipo === 'imagen' && b.url && (
-                          <div className="my-4 text-center">
+                          <div className="my-4 text-center print-avoid-break">
                             <img src={b.url} alt="Imagen" className="max-h-80 mx-auto rounded-xl object-contain" />
                           </div>
                         )}
@@ -3277,7 +3466,7 @@ export default function AdminPage() {
                         <p className="text-xs text-slate-500 mt-2">Personaliza el título, subtítulo, tamaños y colores que aparecerán al inicio de la revista.</p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4 border-t border-slate-100">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-slate-100">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Año Comercial</label>
                           <input 
@@ -3326,6 +3515,34 @@ export default function AdminPage() {
                               onChange={(e) => actualizarConfiguracion('colorFondoPortada', e.target.value)} 
                               className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-base outline-none focus:border-blue-500" 
                             />
+                          </div>
+                        </div>
+
+                        {/* OPCIÓN PARA CAMBIAR EL COLOR DE TODAS LAS PÁGINAS DEL LIBRO EXCEPTO LA PORTADA */}
+                        <div>
+                          <label className="block text-sm font-bold text-blue-700 mb-2 uppercase tracking-wide">Fondo Todas las Páginas</label>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2 items-center">
+                              <input 
+                                type="color" 
+                                value={configuracion.colorFondoPaginasGlobal || '#fdfbf7'} 
+                                onChange={(e) => actualizarConfiguracion('colorFondoPaginasGlobal', e.target.value)} 
+                                className="w-12 h-12 cursor-pointer rounded-xl border-2 shrink-0" 
+                              />
+                              <input 
+                                type="text" 
+                                value={configuracion.colorFondoPaginasGlobal || '#fdfbf7'} 
+                                onChange={(e) => actualizarConfiguracion('colorFondoPaginasGlobal', e.target.value)} 
+                                className="w-full px-3 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl uppercase font-mono font-bold text-sm outline-none focus:border-blue-500" 
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => aplicarColorFondoATodasLasPaginas(configuracion.colorFondoPaginasGlobal || '#fdfbf7')}
+                              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-lg shadow-xs transition-colors cursor-pointer"
+                            >
+                              Aplicar a todas las páginas ({paginas.length})
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -3498,7 +3715,6 @@ export default function AdminPage() {
                   </div>
                 </form>
               )}
-
               {pestañaActiva === 'contenido' && paginaActiva && (
                 <div className="animate-in fade-in duration-500">
                   
@@ -3666,6 +3882,7 @@ export default function AdminPage() {
                       </div>
                     </details>
                   </div>
+
                   <div className="space-y-6">
                     {paginaActiva.bloques.length === 0 && (
                       <div className="border-4 border-dashed border-slate-200 rounded-3xl p-20 flex flex-col items-center justify-center text-slate-400 bg-white/50">
@@ -3744,7 +3961,7 @@ export default function AdminPage() {
 
                             {(bloque.tipo === 'tabla' || bloque.tipo === 'grafica') && (
                               <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-xs">
-                                <span className="text-[10px] font-black text-slate-500 uppercase">Tamaño:</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase">Tamaño Bloque:</span>
                                 <input
                                   type="range"
                                   min="30"
@@ -3797,8 +4014,8 @@ export default function AdminPage() {
                                       <span className="px-2 py-0.5 bg-blue-600 text-[10px] font-black uppercase rounded">Texto Seleccionado</span>
                                       <span className="text-xs font-bold text-blue-200 truncate max-w-xs">&ldquo;{seleccionTextoActiva.texto}&rdquo;</span>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2.5">
-                                      <select id={`float-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-800 text-white border border-slate-700 rounded-lg outline-none max-w-52">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <select id={`float-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-800 text-white border border-slate-700 rounded-lg outline-none max-w-48">
                                         <option value="">-- Elegir Página del Libro --</option>
                                         {paginas.map((p, idx) => (
                                           <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
@@ -3808,21 +4025,36 @@ export default function AdminPage() {
                                         <span className="text-[10px] font-bold text-slate-300">Color:</span>
                                         <input type="color" id={`float-color-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
                                       </div>
-                                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">
+                                      <label className="flex items-center gap-1 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                                        <input type="checkbox" id={`float-bold-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-500" />
+                                        Negrita
+                                      </label>
+                                      <label className="flex items-center gap-1 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                                        <input type="checkbox" id={`float-italic-${bloque.id}`} defaultChecked={false} className="w-3.5 h-3.5 rounded text-blue-500" />
+                                        Cursiva
+                                      </label>
+                                      <label className="flex items-center gap-1 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
                                         <input type="checkbox" id={`float-under-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-500" />
                                         Subrayado
+                                      </label>
+                                      <label className="flex items-center gap-1 text-xs font-bold text-slate-200 cursor-pointer bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                                        <input type="checkbox" id={`float-strike-${bloque.id}`} defaultChecked={false} className="w-3.5 h-3.5 rounded text-blue-500" />
+                                        Tachado
                                       </label>
                                       <button
                                         type="button"
                                         onClick={() => {
                                           const pagId = (document.getElementById(`float-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
                                           const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                          const bld = (document.getElementById(`float-bold-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          const ita = (document.getElementById(`float-italic-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                           const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          const stk = (document.getElementById(`float-strike-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                           if (!pagId) {
                                             mostrarMensaje('Elige primero la página del libro en la lista desplegable.', 'error');
                                             return;
                                           }
-                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'pagina', pagId, colHex, sub);
+                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'pagina', pagId, colHex, sub, bld, stk, ita);
                                         }}
                                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
                                       >
@@ -3839,12 +4071,15 @@ export default function AdminPage() {
                                         onClick={() => {
                                           const urlEx = (document.getElementById(`float-url-${bloque.id}`) as HTMLInputElement)?.value || '';
                                           const colHex = (document.getElementById(`float-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                          const bld = (document.getElementById(`float-bold-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          const ita = (document.getElementById(`float-italic-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                           const sub = (document.getElementById(`float-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                          const stk = (document.getElementById(`float-strike-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                           if (!urlEx.trim()) {
                                             mostrarMensaje('Escribe la URL externa.', 'error');
                                             return;
                                           }
-                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'url', urlEx, colHex, sub);
+                                          enlazarTextoEnColumna(bloque.id, seleccionTextoActiva.columna, '', 'url', urlEx, colHex, sub, bld, stk, ita);
                                         }}
                                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg shadow transition-colors cursor-pointer"
                                       >
@@ -3910,8 +4145,8 @@ export default function AdminPage() {
                                 {/* BARRA DE HERRAMIENTAS AVANZADA DEL BLOQUE DE TEXTO */}
                                 <div className="bg-slate-50 p-4 border-t border-slate-200 space-y-3 rounded-b-2xl">
                                   
-                                  {/* 1. ENLAZAR TEXTO SELECCIONADO O LÍNEA DE ÍNDICE */}
-                                  <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                                  {/* 1. ENLAZAR TEXTO SELECCIONADO O ESCRITO CON NEGRITA, CURSIVA, SUBRAYADO Y TACHADO */}
+                                  <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
                                     <span className="text-[11px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
                                       <Link2 size={14} /> Enlazar Texto (Sombréalo arriba):
                                     </span>
@@ -3926,9 +4161,9 @@ export default function AdminPage() {
                                       type="text"
                                       id={`link-txt-${bloque.id}`}
                                       placeholder="Sombrea texto arriba o escríbelo..."
-                                      className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 min-w-48"
+                                      className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 min-w-44"
                                     />
-                                    <select id={`link-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-52">
+                                    <select id={`link-page-${bloque.id}`} defaultValue="" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-48">
                                       <option value="">-- Elegir Página Destino --</option>
                                       {paginas.map((p, idx) => (
                                         <option key={p.id} value={p.id}>
@@ -3936,7 +4171,7 @@ export default function AdminPage() {
                                         </option>
                                       ))}
                                     </select>
-                                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200" title="Elige el color del texto enlazado">
+                                    <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Elige el color del texto enlazado">
                                       <span className="text-[10px] font-bold text-slate-500">Color:</span>
                                       <input
                                         type="color"
@@ -3945,14 +4180,21 @@ export default function AdminPage() {
                                         className="w-5 h-5 rounded cursor-pointer border-0 p-0"
                                       />
                                     </div>
-                                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
-                                      <input
-                                        type="checkbox"
-                                        id={`link-under-${bloque.id}`}
-                                        defaultChecked={true}
-                                        className="w-3.5 h-3.5 rounded text-blue-600"
-                                      />
-                                      Subrayado
+                                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200" title="Negrita">
+                                      <input type="checkbox" id={`link-bold-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-600" />
+                                      <strong>B</strong> Negrita
+                                    </label>
+                                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200" title="Cursiva">
+                                      <input type="checkbox" id={`link-italic-${bloque.id}`} defaultChecked={false} className="w-3.5 h-3.5 rounded text-blue-600" />
+                                      <em>I</em> Cursiva
+                                    </label>
+                                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200" title="Subrayado">
+                                      <input type="checkbox" id={`link-under-${bloque.id}`} defaultChecked={true} className="w-3.5 h-3.5 rounded text-blue-600" />
+                                      <u>U</u> Subrayado
+                                    </label>
+                                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-2 py-1.5 rounded-lg border border-slate-200" title="Tachado">
+                                      <input type="checkbox" id={`link-strike-${bloque.id}`} defaultChecked={false} className="w-3.5 h-3.5 rounded text-blue-600" />
+                                      <s>S</s> Tachado
                                     </label>
                                     <button
                                       type="button"
@@ -3961,12 +4203,15 @@ export default function AdminPage() {
                                         const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
                                         const pagId = (document.getElementById(`link-page-${bloque.id}`) as HTMLSelectElement)?.value || '';
                                         const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                        const bld = (document.getElementById(`link-bold-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        const ita = (document.getElementById(`link-italic-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                         const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        const stk = (document.getElementById(`link-strike-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                         if (!pagId) {
                                           mostrarMensaje('Selecciona primero la página del libro a la que deseas redirigir.', 'error');
                                           return;
                                         }
-                                        enlazarTextoEnColumna(bloque.id, col, txt, 'pagina', pagId, colHex, sub);
+                                        enlazarTextoEnColumna(bloque.id, col, txt, 'pagina', pagId, colHex, sub, bld, stk, ita);
                                       }}
                                       className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs cursor-pointer"
                                     >
@@ -3977,7 +4222,7 @@ export default function AdminPage() {
                                       type="text"
                                       id={`link-url-${bloque.id}`}
                                       placeholder="https://..."
-                                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none w-32"
+                                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none w-28"
                                     />
                                     <button
                                       type="button"
@@ -3986,12 +4231,15 @@ export default function AdminPage() {
                                         const txt = (document.getElementById(`link-txt-${bloque.id}`) as HTMLInputElement)?.value || '';
                                         const urlEx = (document.getElementById(`link-url-${bloque.id}`) as HTMLInputElement)?.value || '';
                                         const colHex = (document.getElementById(`link-color-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
+                                        const bld = (document.getElementById(`link-bold-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        const ita = (document.getElementById(`link-italic-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                         const sub = (document.getElementById(`link-under-${bloque.id}`) as HTMLInputElement)?.checked ?? true;
+                                        const stk = (document.getElementById(`link-strike-${bloque.id}`) as HTMLInputElement)?.checked ?? false;
                                         if (!urlEx.trim()) {
                                           mostrarMensaje('Escribe la URL externa.', 'error');
                                           return;
                                         }
-                                        enlazarTextoEnColumna(bloque.id, col, txt, 'url', urlEx, colHex, sub);
+                                        enlazarTextoEnColumna(bloque.id, col, txt, 'url', urlEx, colHex, sub, bld, stk, ita);
                                       }}
                                       className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                                     >
@@ -4049,7 +4297,6 @@ export default function AdminPage() {
                                       </div>
                                     </div>
 
-                                    {/* GESTOR INDIVIDUAL DE IMÁGENES YA INSERTADAS EN ESTE BLOQUE DE TEXTO */}
                                     {todasImgsEnBloque.length > 0 && (
                                       <div className="pt-3 border-t border-slate-100 space-y-2">
                                         <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -4067,7 +4314,6 @@ export default function AdminPage() {
                                               </div>
 
                                               <div className="flex flex-wrap items-center gap-1.5">
-                                                {/* Mover arriba o abajo entre párrafos */}
                                                 <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5" title="Subir o bajar la imagen entre los párrafos del texto">
                                                   <button
                                                     type="button"
@@ -4087,7 +4333,6 @@ export default function AdminPage() {
                                                   </button>
                                                 </div>
 
-                                                {/* Alineación Izquierda / Centro / Derecha */}
                                                 <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5">
                                                   <button
                                                     type="button"
@@ -4115,7 +4360,6 @@ export default function AdminPage() {
                                                   </button>
                                                 </div>
 
-                                                {/* Esquinas Cuadradas vs Redondeadas */}
                                                 <select
                                                   value={imgItem.borde}
                                                   onChange={(e) => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { borde: e.target.value as 'cuadrado' | 'redondeado' | 'circular' })}
@@ -4127,7 +4371,6 @@ export default function AdminPage() {
                                                   <option value="circular">Circular</option>
                                                 </select>
 
-                                                {/* Tamaño / Ancho en vivo */}
                                                 <select
                                                   value={['15%', '25%', '35%', '50%', '75%', '100%'].includes(imgItem.ancho) ? imgItem.ancho : '50%'}
                                                   onChange={(e) => actualizarImagenEspecificaEnTexto(bloque.id, imgItem.colNum, imgItem.indice, { ancho: e.target.value })}
@@ -4142,7 +4385,6 @@ export default function AdminPage() {
                                                   <option value="100%">100%</option>
                                                 </select>
 
-                                                {/* Botón Eliminar esta imagen */}
                                                 <button
                                                   type="button"
                                                   onClick={() => eliminarImagenDeColumnaTexto(bloque.id, imgItem.colNum, imgItem.indice)}
@@ -4159,44 +4401,55 @@ export default function AdminPage() {
                                     )}
                                   </div>
 
-                                  {/* 3. GENERADOR DE BOTONES INLINE DENTRO DEL TEXTO */}
-                                  <div className="flex flex-wrap items-center gap-2.5 bg-white p-3 rounded-xl border border-slate-200">
+                                  {/* 3. GENERADOR DE BOTONES INLINE DENTRO DEL TEXTO (CON TAMAÑO Y TIPO DE LETRA) */}
+                                  <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
                                     <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                                       <MousePointerClick size={14} className="text-blue-600" /> Botón en Texto:
                                     </span>
-                                    <input type="text" id={`in-btn-txt-${bloque.id}`} placeholder="Texto del botón" className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
-                                    <input type="text" id={`in-btn-url-${bloque.id}`} placeholder="https://... o elige página" className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" />
+                                    <input type="text" id={`in-btn-txt-${bloque.id}`} placeholder="Texto del botón" className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 w-32" />
+                                    <input type="text" id={`in-btn-url-${bloque.id}`} placeholder="https://... o elige página" className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500 w-36" />
                                     <select
                                       onChange={(e) => {
                                         const inputUrl = document.getElementById(`in-btn-url-${bloque.id}`) as HTMLInputElement;
                                         if (inputUrl && e.target.value) inputUrl.value = `#pagina:${e.target.value}`;
                                       }}
                                       defaultValue=""
-                                      className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-44"
+                                      className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none max-w-40"
                                     >
                                       <option value="">Ir a página...</option>
                                       {paginas.map((p, idx) => (
                                         <option key={p.id} value={p.id}>Hoja {idx + 1}: {p.titulo || 'Sin título'}</option>
                                       ))}
                                     </select>
-                                    <select id={`in-btn-style-${bloque.id}`} defaultValue="solido" className="px-2.5 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
+                                    <select id={`in-btn-style-${bloque.id}`} defaultValue="solido" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none">
                                       <option value="solido">Sólido</option>
                                       <option value="pildora">Píldora (Ovalado)</option>
                                       <option value="contorno">Contorno</option>
                                       <option value="3d">3D Relieve</option>
                                       <option value="4d">4D Glow (Iluminado)</option>
                                     </select>
+                                    <select id={`in-btn-size-${bloque.id}`} defaultValue="mediano" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none" title="Tamaño del botón">
+                                      <option value="pequeno">Tamaño: Pequeño</option>
+                                      <option value="mediano">Tamaño: Mediano</option>
+                                      <option value="grande">Tamaño: Grande</option>
+                                      <option value="extragrande">Tamaño: Extragrande</option>
+                                    </select>
+                                    <select id={`in-btn-font-${bloque.id}`} defaultValue="arial" className="px-2 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none" title="Tipo de letra del botón">
+                                      {FUENTES_WORD.map(f => (
+                                        <option key={f} value={f}>Letra: {NOMBRES_FUENTES_WORD[f]?.label || f}</option>
+                                      ))}
+                                    </select>
                                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color principal del botón">
                                       <span className="text-[10px] font-bold text-slate-500">Fondo:</span>
-                                      <input type="color" id={`in-btn-bg-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                      <input type="color" id={`in-btn-bg-${bloque.id}`} defaultValue={edicionActiva?.color_principal || '#1d4ed8'} className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
                                     </div>
                                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Color del texto">
                                       <span className="text-[10px] font-bold text-slate-500">Texto:</span>
-                                      <input type="color" id={`in-btn-tc-${bloque.id}`} defaultValue="#ffffff" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                      <input type="color" id={`in-btn-tc-${bloque.id}`} defaultValue="#ffffff" className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
                                     </div>
                                     <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-blue-200" title="Color de iluminación (para 4D Glow)">
                                       <span className="text-[10px] font-bold text-blue-600">Luz 4D:</span>
-                                      <input type="color" id={`in-btn-glow-${bloque.id}`} defaultValue="#60a5fa" className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
+                                      <input type="color" id={`in-btn-glow-${bloque.id}`} defaultValue="#60a5fa" className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
                                     </div>
                                     <button
                                       type="button"
@@ -4207,7 +4460,9 @@ export default function AdminPage() {
                                         const bg = (document.getElementById(`in-btn-bg-${bloque.id}`) as HTMLInputElement)?.value || '#1d4ed8';
                                         const tc = (document.getElementById(`in-btn-tc-${bloque.id}`) as HTMLInputElement)?.value || '#ffffff';
                                         const glow = (document.getElementById(`in-btn-glow-${bloque.id}`) as HTMLInputElement)?.value || '#60a5fa';
-                                        const tag = `[[BOTON|${txt}|${url}|${est}|${bg}|${tc}|${glow}]]`;
+                                        const sz = (document.getElementById(`in-btn-size-${bloque.id}`) as HTMLSelectElement)?.value || 'mediano';
+                                        const fnt = (document.getElementById(`in-btn-font-${bloque.id}`) as HTMLSelectElement)?.value || 'arial';
+                                        const tag = `[[BOTON|${txt}|${url}|${est}|${bg}|${tc}|${glow}|${sz}|${fnt}]]`;
                                         actualizarBloqueTexto(bloque.id, `${bloque.contenido}<p>${tag}</p>`);
                                       }}
                                       className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
@@ -4227,7 +4482,7 @@ export default function AdminPage() {
                             );
                           })()}
 
-                          {/* BLOQUE ESPECIAL DE FIRMAS CON CONTROL DE TAMAÑO REAL, POSICIÓN VERTICAL Y BOTÓN DE QUITAR SOLO IMAGEN */}
+                          {/* BLOQUE ESPECIAL DE FIRMAS CON MOVIMIENTO VERTICAL 100% INDIVIDUAL Y SLIDER GENERAL */}
                           {bloque.tipo === 'firma' && (
                             <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -4246,9 +4501,8 @@ export default function AdminPage() {
                                     </select>
                                   </div>
 
-                                  {/* Control de espacio general superior e inferior de todo el bloque de firmas */}
-                                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-                                    <span className="text-[11px] font-bold text-slate-600">Espacio Arriba del Bloque:</span>
+                                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200" title="Sube o baja todas las firmas juntas dentro del bloque">
+                                    <span className="text-[11px] font-bold text-slate-600">Mover Todas Juntas:</span>
                                     <input
                                       type="range"
                                       min="-40"
@@ -4324,7 +4578,7 @@ export default function AdminPage() {
                                         />
                                       </div>
 
-                                      {/* SLIDER DE TAMAÑO / ALTURA DE LA IMAGEN DE FIRMA (FUNCIONAL AL 100%) */}
+                                      {/* SLIDER DE TAMAÑO Y SLIDER DE MOVIMIENTO VERTICAL INDIVIDUAL (SOLO MUEVE ESTA FIRMA) */}
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-3.5 rounded-xl border border-slate-200">
                                         <div>
                                           <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
@@ -4342,15 +4596,14 @@ export default function AdminPage() {
                                           />
                                         </div>
 
-                                        {/* SLIDER PARA SUBIR O BAJAR ESTA FIRMA INDIVIDUALMENTE */}
                                         <div>
                                           <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
-                                            <span>Subir / Bajar Firma</span>
+                                            <span>Subir / Bajar solo esta Firma</span>
                                             <span className="text-amber-600 font-black">{fItem.espacioSuperior ?? 0}px</span>
                                           </label>
                                           <input
                                             type="range"
-                                            min="-50"
+                                            min="-60"
                                             max="120"
                                             step="2"
                                             value={fItem.espacioSuperior ?? 0}
@@ -4388,9 +4641,9 @@ export default function AdminPage() {
                                 })}
                               </div>
 
-                              {/* VISTA PREVIA FIEL DE LAS FIRMAS CON TAMAÑO Y ESPACIADO EN TIEMPO REAL */}
+                              {/* VISTA PREVIA FIEL DE LAS FIRMAS CON MOVIMIENTO INDIVIDUAL SIN AFECTAR A LAS DEMÁS */}
                               <div 
-                                className={`p-6 bg-white rounded-2xl border border-dashed border-slate-300 flex flex-wrap gap-12 items-end ${
+                                className={`p-6 bg-white rounded-2xl border border-dashed border-slate-300 flex flex-wrap gap-12 items-start ${
                                   bloque.alineacion === 'centro' ? 'justify-center text-center' :
                                   bloque.alineacion === 'derecha' ? 'justify-end text-right' :
                                   bloque.alineacion === 'espaciado' ? 'justify-around text-left' :
@@ -4404,8 +4657,8 @@ export default function AdminPage() {
                                 {bloque.firmas.map((fItem, i) => (
                                   <div 
                                     key={i} 
-                                    className="flex flex-col space-y-1 min-w-52 transition-all"
-                                    style={{ marginTop: `${fItem.espacioSuperior ?? 0}px` }}
+                                    className="flex flex-col space-y-1 min-w-52 transition-transform"
+                                    style={{ transform: `translateY(${fItem.espacioSuperior ?? 0}px)` }}
                                   >
                                     {fItem.url ? (
                                       <div className={`mb-2 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
@@ -4434,7 +4687,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* CONFIGURADOR DE BLOQUE BOTÓN */}
+                          {/* CONFIGURADOR DE BLOQUE BOTÓN CON TAMAÑO Y TIPO DE LETRA */}
                           {bloque.tipo === 'boton' && (
                             <div className="p-6 space-y-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-200">
@@ -4485,6 +4738,33 @@ export default function AdminPage() {
                                     <option value="contorno">Contorno Elegante (Transparente)</option>
                                     <option value="3d">3D con Relieve Físico</option>
                                     <option value="4d">4D Iluminado (Sombra de Neón Estática)</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Tamaño del Botón</label>
+                                  <select
+                                    value={bloque.tamanoBoton || 'mediano'}
+                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'tamanoBoton', e.target.value as TamanoBoton)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    <option value="pequeno">Pequeño (Compacto)</option>
+                                    <option value="mediano">Mediano (Estándar)</option>
+                                    <option value="grande">Grande (Destacado)</option>
+                                    <option value="extragrande">Extragrande (Hero)</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Tipo de Letra del Botón</label>
+                                  <select
+                                    value={bloque.fuenteBoton || 'arial'}
+                                    onChange={(e) => actualizarBloqueBoton(bloque.id, 'fuenteBoton', e.target.value)}
+                                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                                  >
+                                    {FUENTES_WORD.map(f => (
+                                      <option key={f} value={f}>{NOMBRES_FUENTES_WORD[f]?.label || f}</option>
+                                    ))}
                                   </select>
                                 </div>
 
@@ -4545,33 +4825,42 @@ export default function AdminPage() {
                                 </div>
                               </div>
 
-                              <div className={`p-6 bg-slate-100/70 rounded-xl border border-dashed border-slate-300 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                                <a
-                                  href={bloque.url || '#'}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(e) => e.preventDefault()}
-                                  style={{
-                                    backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
-                                    color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
-                                    borderColor: bloque.colorBoton,
-                                    boxShadow: bloque.estilo === '3d' 
-                                      ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
-                                      : bloque.estilo === '4d'
-                                      ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
-                                      : undefined
-                                  }}
-                                  className={`px-8 py-4 font-sans font-black text-sm uppercase tracking-wider transition-all inline-block ${
-                                    bloque.estilo === 'pildora' ? 'rounded-full shadow-md' :
-                                    bloque.estilo === 'contorno' ? 'rounded-xl border-2' :
-                                    bloque.estilo === '3d' ? 'rounded-xl -translate-y-1' :
-                                    bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
-                                    'rounded-xl shadow-md'
-                                  }`}
-                                >
-                                  {bloque.texto || 'Botón'}
-                                </a>
-                              </div>
+                              {(() => {
+                                const sz = obtenerEstilosTamanoBoton(bloque.tamanoBoton);
+                                const fnt = NOMBRES_FUENTES_WORD[bloque.fuenteBoton || 'arial']?.family || 'sans-serif';
+                                return (
+                                  <div className={`p-6 bg-slate-100/70 rounded-xl border border-dashed border-slate-300 flex ${bloque.alineacion === 'centro' ? 'justify-center' : bloque.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                    <a
+                                      href={bloque.url || '#'}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(e) => e.preventDefault()}
+                                      style={{
+                                        backgroundColor: bloque.estilo === 'contorno' ? 'transparent' : bloque.colorBoton,
+                                        color: bloque.estilo === 'contorno' ? bloque.colorBoton : bloque.colorTexto,
+                                        borderColor: bloque.colorBoton,
+                                        padding: sz.padding,
+                                        fontSize: sz.fontSize,
+                                        fontFamily: fnt,
+                                        boxShadow: bloque.estilo === '3d' 
+                                          ? `0 6px 0 0 ${bloque.colorBoton}aa, 0 10px 15px -3px rgba(0,0,0,0.2)` 
+                                          : bloque.estilo === '4d'
+                                          ? `0 0 25px 4px ${bloque.colorIluminacion || bloque.colorBoton}, inset 0 0 12px rgba(255,255,255,0.4)`
+                                          : undefined
+                                      }}
+                                      className={`font-black uppercase tracking-wider transition-all inline-block ${
+                                        bloque.estilo === 'pildora' ? 'rounded-full shadow-md' :
+                                        bloque.estilo === 'contorno' ? 'rounded-xl border-2' :
+                                        bloque.estilo === '3d' ? 'rounded-xl -translate-y-1' :
+                                        bloque.estilo === '4d' ? 'rounded-full border border-white/40' :
+                                        'rounded-xl shadow-md'
+                                      }`}
+                                    >
+                                      {bloque.texto || 'Botón'}
+                                    </a>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
 
@@ -4615,7 +4904,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* TABLA CON VISTA PREVIA ULTRA COMPACTA REAL */}
+                          {/* TABLA CON VISTA PREVIA ULTRA COMPACTA REAL Y PIE DE TABLA INTEGRADO */}
                           {bloque.tipo === 'tabla' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
@@ -4878,6 +5167,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
+                          {/* CONFIGURADOR DE GRÁFICAS (CON SELECTOR DE PALETAS, ALTURA VERTICAL, OCULTAR EJE X, OCULTAR LEYENDA Y DIAGNÓSTICO GEOESPACIAL) */}
                           {bloque.tipo === 'grafica' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <input 
@@ -4950,6 +5240,7 @@ export default function AdminPage() {
                                   }
                                   
                                   const usaColorPorFila = esGraficaPorSegmento(bloque.tipoGrafica) || (['barras', 'barras_horizontales', 'barras_4d'].includes(bloque.tipoGrafica) && ejesYUsar.length === 1);
+                                  const paletaActiva = obtenerPaletaActivaBloque(bloque);
 
                                   return (
                                     <>
@@ -5004,80 +5295,179 @@ export default function AdminPage() {
                                         </div>
                                       </div>
 
-                                      <div className="col-span-1 md:col-span-2 pt-2">
-                                        <label className="flex items-center gap-3 text-sm font-bold text-slate-800 cursor-pointer bg-white p-4 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-sm">
+                                      {/* 3 CHECKBOXES DE VISIBILIDAD: VALORES FIJOS, OCULTAR NOMBRES EJE X Y OCULTAR LEYENDA INFERIOR */}
+                                      <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                                        <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-xs">
                                           <input
                                             type="checkbox"
                                             checked={!!bloque.mostrarValores}
                                             onChange={(e) => actualizarGrafica(bloque.id, 'mostrarValores', e.target.checked)}
-                                            className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                                           />
                                           {bloque.tipoGrafica === 'mapa_colombia'
-                                            ? 'Mostrar tabla lateral de valores por departamento (Desmárcala para dejar solo el mapa limpio con valores al pasar el cursor)'
-                                            : 'Mostrar valores numéricos / estadísticas fijos encima de la gráfica (Sin necesidad de pasar el mouse)'}
+                                            ? 'Mostrar tabla lateral de valores por región'
+                                            : 'Mostrar valores numéricos fijos encima'}
+                                        </label>
+
+                                        <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-xs">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!bloque.ocultarEjeX}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'ocultarEjeX', e.target.checked)}
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                                          />
+                                          Desactivar / Ocultar nombres del Eje X (Categorías)
+                                        </label>
+
+                                        <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-xs">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!bloque.ocultarLeyenda}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'ocultarLeyenda', e.target.checked)}
+                                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                                          />
+                                          Desactivar / Ocultar leyenda inferior
                                         </label>
                                       </div>
 
-                                      <div className="col-span-1 md:col-span-2 mt-2 pt-6 border-t border-slate-200">
-                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                          <Palette size={16} /> Personalización Exacta de Colores ({bloque.tipoGrafica === 'mapa_colombia' ? 1 : (usaColorPorFila ? datos.length : ejesYUsar.length)} elementos activos)
-                                        </h4>
-                                        <p className="text-xs text-slate-400 mb-4">
-                                          💡 También puedes hacer <strong>clic directamente sobre cualquier barra o segmento en la Vista Previa</strong> de abajo para cambiar su color.
-                                        </p>
-                                        
-                                        {bloque.tipoGrafica === 'mapa_colombia' ? (
-                                          <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 w-fit">
-                                            <input 
-                                              type="color" 
-                                              value={bloque.coloresCustom?.[0] || edicionActiva.color_principal || '#93c5fd'} 
-                                              onChange={(e) => actualizarGraficaColor(bloque.id, 0, e.target.value)} 
-                                              className="w-10 h-10 cursor-pointer rounded-lg border-2"
-                                            />
-                                            <div>
-                                              <span className="block text-sm font-bold text-slate-800">Color principal del Mapa</span>
-                                              <span className="block text-xs text-slate-500">Tono fuerte del gradiente</span>
+                                      {/* SLIDER PARA CAMBIAR LA ALTURA INTERNA DE LA GRÁFICA */}
+                                      <div className="col-span-1 md:col-span-2 bg-white p-4 rounded-xl border border-slate-200">
+                                        <label className="flex justify-between text-xs font-bold text-slate-700 uppercase mb-2">
+                                          <span>Tamaño / Altura de la Gráfica dentro del Bloque</span>
+                                          <span className="text-blue-600 font-black">{bloque.alturaGrafica || 380}px</span>
+                                        </label>
+                                        <input
+                                          type="range"
+                                          min="220"
+                                          max="750"
+                                          step="10"
+                                          value={bloque.alturaGrafica || 380}
+                                          onChange={(e) => actualizarGrafica(bloque.id, 'alturaGrafica', Number(e.target.value))}
+                                          className="w-full accent-blue-600 cursor-pointer"
+                                        />
+                                      </div>
+
+                                      {/* SELECTOR DE PALETA / TEMA DE COLORES Y PERSONALIZACIÓN INDIVIDUAL */}
+                                      <div className="col-span-1 md:col-span-2 mt-2 pt-6 border-t border-slate-200 space-y-5">
+                                        <div className="bg-white p-4 rounded-xl border border-slate-200">
+                                          <label className="block text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">
+                                            Selector de Tema / Paleta de Colores (Haz clic para cambiar toda la paleta)
+                                          </label>
+                                          <div className="flex flex-col sm:flex-row gap-3 items-center">
+                                            <select
+                                              value={bloque.paletaNombre || 'secundarios'}
+                                              onChange={(e) => aplicarPaletaAGrafica(bloque.id, e.target.value)}
+                                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 cursor-pointer"
+                                            >
+                                              {Object.keys(PALETAS_GRAFICAS).map(clave => (
+                                                <option key={clave} value={clave}>
+                                                  {PALETAS_GRAFICAS[clave].nombre}
+                                                </option>
+                                              ))}
+                                            </select>
+                                            <div className="flex items-center gap-1 shrink-0 px-2">
+                                              {(PALETAS_GRAFICAS[bloque.paletaNombre || 'secundarios']?.colores || COLORES_GRAFICAS_DEFAULT).slice(0, 8).map((cHex, cIdx) => (
+                                                <span key={cIdx} className="w-5 h-5 rounded-full border border-white shadow-xs" style={{ backgroundColor: cHex }} />
+                                              ))}
                                             </div>
                                           </div>
-                                        ) : usaColorPorFila ? (
-                                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
-                                            {datos.map((d: any, idx: number) => (
-                                              <div key={idx} className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 transition-colors">
-                                                <input 
-                                                  type="color" 
-                                                  value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
-                                                  onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
-                                                  className="w-7 h-7 cursor-pointer rounded-md border shrink-0"
-                                                  title={`Cambiar color de ${d.name}`}
-                                                />
-                                                <span className="text-xs font-bold text-slate-700 truncate" title={d.name}>{d.name}</span>
+                                        </div>
+
+                                        <div>
+                                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <Palette size={16} /> Personalización Exacta de Colores ({bloque.tipoGrafica === 'mapa_colombia' ? 1 : (usaColorPorFila ? datos.length : ejesYUsar.length)} elementos activos)
+                                          </h4>
+                                          <p className="text-xs text-slate-400 mb-4">
+                                            💡 También puedes hacer <strong>clic directamente sobre cualquier barra o segmento en la Vista Previa</strong> de abajo para cambiar su color.
+                                          </p>
+                                          
+                                          {bloque.tipoGrafica === 'mapa_colombia' ? (
+                                            <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 w-fit">
+                                              <input 
+                                                type="color" 
+                                                value={bloque.coloresCustom?.[0] || edicionActiva.color_principal || '#f97316'} 
+                                                onChange={(e) => actualizarGraficaColor(bloque.id, 0, e.target.value)} 
+                                                className="w-10 h-10 cursor-pointer rounded-lg border-2"
+                                              />
+                                              <div>
+                                                <span className="block text-sm font-bold text-slate-800">Color principal del Mapa</span>
+                                                <span className="block text-xs text-slate-500">Tono fuerte del gradiente</span>
                                               </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {ejesYUsar.map((ejeYIdx, idx) => {
-                                               const nombreEje = cabeceras[ejeYIdx] || `Serie ${idx + 1}`;
-                                               return (
-                                                  <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
-                                                    <input 
-                                                      type="color" 
-                                                      value={bloque.coloresCustom?.[idx] || COLORES_GRAFICAS_DEFAULT[idx % COLORES_GRAFICAS_DEFAULT.length]} 
-                                                      onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
-                                                      className="w-8 h-8 cursor-pointer rounded-md border shrink-0"
-                                                    />
-                                                    <span className="text-sm font-bold text-slate-700 truncate">{nombreEje}</span>
-                                                  </div>
-                                               );
-                                            })}
-                                          </div>
-                                        )}
+                                            </div>
+                                          ) : usaColorPorFila ? (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                                              {datos.map((d: any, idx: number) => (
+                                                <div key={idx} className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 transition-colors">
+                                                  <input 
+                                                    type="color" 
+                                                    value={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} 
+                                                    onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
+                                                    className="w-7 h-7 cursor-pointer rounded-md border shrink-0"
+                                                    title={`Cambiar color de ${d.name}`}
+                                                  />
+                                                  <span className="text-xs font-bold text-slate-700 truncate" title={d.name}>{d.name}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                              {ejesYUsar.map((ejeYIdx, idx) => {
+                                                 const nombreEje = cabeceras[ejeYIdx] || `Serie ${idx + 1}`;
+                                                 return (
+                                                    <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                                                      <input 
+                                                        type="color" 
+                                                        value={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} 
+                                                        onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
+                                                        className="w-8 h-8 cursor-pointer rounded-md border shrink-0"
+                                                      />
+                                                      <span className="text-sm font-bold text-slate-700 truncate">{nombreEje}</span>
+                                                    </div>
+                                                 );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
+
+                                      {bloque.tipoGrafica === 'mapa_colombia' && datos.length > 0 && (
+                                        <div className="col-span-1 md:col-span-2 mt-4 bg-slate-800 p-6 rounded-xl border border-slate-700 text-white shadow-inner">
+                                            <h4 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                                                <MapIcon size={16} /> Diagnóstico Geoespacial
+                                            </h4>
+                                            <div className="overflow-x-auto rounded-lg border border-slate-700">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-slate-900 text-slate-400">
+                                                        <tr>
+                                                            <th className="p-3">Ubicación Extraída</th>
+                                                            <th className="p-3">Valor Numérico</th>
+                                                            <th className="p-3">Estado</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-700 bg-slate-800/50">
+                                                        {datos.map((d: any, i: number) => (
+                                                            <tr key={i} className="hover:bg-slate-800 transition-colors">
+                                                                <td className="p-3 font-medium text-blue-300">{d.name}</td>
+                                                                <td className="p-3 font-mono text-amber-300">{d.valorMapa}{d.esPorcentaje ? '%' : ''}</td>
+                                                                <td className="p-3">
+                                                                    {d.valorMapa > 0 
+                                                                        ? <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">✅ Listo</span>
+                                                                        : <span className="px-2 py-1 rounded bg-red-500/20 text-red-300 font-bold">⚠️ Cero</span>}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                      )}
+
                                     </>
                                   );
                                 })()}
                               </div>
 
+                              {/* VISTA PREVIA FIEL AL TIPO DE GRÁFICA SELECCIONADO + POPUP AL CLIC EN ELEMENTO */}
                               {bloque.tablaRef && (
                                 <div 
                                   className="mt-8 p-6 border-2 border-dashed border-slate-200 rounded-xl relative mx-auto transition-all"
@@ -5096,7 +5486,7 @@ export default function AdminPage() {
                                         <span className="text-xs font-bold">Color de &quot;{selectorColorActivo.etiqueta}&quot;:</span>
                                         <input
                                           type="color"
-                                          value={bloque.coloresCustom?.[selectorColorActivo.indice] || COLORES_GRAFICAS_DEFAULT[selectorColorActivo.indice % COLORES_GRAFICAS_DEFAULT.length]}
+                                          value={bloque.coloresCustom?.[selectorColorActivo.indice] || obtenerPaletaActivaBloque(bloque)[selectorColorActivo.indice % obtenerPaletaActivaBloque(bloque).length]}
                                           onChange={(e) => actualizarGraficaColor(bloque.id, selectorColorActivo.indice, e.target.value)}
                                           className="w-7 h-7 rounded cursor-pointer border-0"
                                         />
@@ -5120,6 +5510,7 @@ export default function AdminPage() {
                                 </div>
                               )}
 
+                              {/* PIE / NOTA / FUENTE PEGADO JUSTO DEBAJO DE LA GRÁFICA */}
                               <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
                                 <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
                                   <Type size={14} className="text-blue-600" />
