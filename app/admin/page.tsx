@@ -569,22 +569,19 @@ type ConfiguracionEdicion = {
   mostrarPiePaginaGlobal?: boolean;
 };
 
-// FUNCIÓN UNIVERSAL PARA CONVERTIR TEXTO DE EXCEL (TSV) O ARCHIVO CSV EN MATRIZ DE FILAS Y COLUMNAS EXACTA
+// FUNCIÓN UNIVERSAL BLINDADA PARA CONVERTIR TEXTO DE EXCEL (TSV) O ARCHIVO CSV EN MATRIZ LIMPIA SIN FILAS/COLUMNAS FANTASMA
 const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
   if (!textoCrudo) return [];
   const textoSinBom = textoCrudo.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lineas = textoSinBom.split('\n');
-  while (lineas.length > 0 && lineas[lineas.length - 1].trim() === '') {
-    lineas.pop();
-  }
-  if (lineas.length === 0) return [];
 
-  // Detectar si viene de copiar y pegar directo de Excel (usa tabulador \t) o de un archivo CSV (usa ; o ,)
-  const primeraLinea = lineas[0];
+  const primeraLineaConContenido = lineas.find(l => l.trim().length > 0) || '';
+  if (!primeraLineaConContenido) return [];
+
   let delimitador = '\t';
-  if (!primeraLinea.includes('\t')) {
-    const conteoPuntoYComa = (primeraLinea.match(/;/g) || []).length;
-    const conteoComa = (primeraLinea.match(/,/g) || []).length;
+  if (!primeraLineaConContenido.includes('\t')) {
+    const conteoPuntoYComa = (primeraLineaConContenido.match(/;/g) || []).length;
+    const conteoComa = (primeraLineaConContenido.match(/,/g) || []).length;
     if (conteoPuntoYComa > 0 || conteoComa > 0) {
       delimitador = conteoPuntoYComa >= conteoComa ? ';' : ',';
     }
@@ -592,7 +589,13 @@ const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
 
   const parsearLinea = (linea: string, sep: string): string[] => {
     if (sep === '\t') {
-      return linea.split('\t').map(celda => celda.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
+      return linea.split('\t').map(celda =>
+        celda
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+          .trim()
+          .replace(/^"(.*)"$/, '$1')
+          .replace(/""/g, '"')
+      );
     }
     const resultado: string[] = [];
     let actual = '';
@@ -607,25 +610,45 @@ const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
           enComillas = !enComillas;
         }
       } else if (char === sep && !enComillas) {
-        resultado.push(actual.trim());
+        resultado.push(actual.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ').trim());
         actual = '';
       } else {
         actual += char;
       }
     }
-    resultado.push(actual.trim());
+    resultado.push(actual.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ').trim());
     return resultado;
   };
 
-  const matrizCruda = lineas.map(l => parsearLinea(l, delimitador));
-  const maxCols = Math.max(...matrizCruda.map(f => f.length), 1);
+  // Filtrar filas que estén 100% vacías (muy común al seleccionar de más en Excel)
+  const matrizSinFilasVacias = lineas
+    .map(l => parsearLinea(l, delimitador))
+    .filter(fila => fila.some(celda => celda.trim() !== ''));
 
-  return matrizCruda.map(fila => {
-    const filaNormalizada = [...fila];
-    while (filaNormalizada.length < maxCols) {
-      filaNormalizada.push('');
+  if (matrizSinFilasVacias.length === 0) return [];
+
+  // Detectar la última columna que realmente tiene algún dato en cualquier fila para descartar columnas vacías sobrantes de Excel
+  let ultimaColConDatos = 0;
+  matrizSinFilasVacias.forEach(fila => {
+    fila.forEach((celda, cIdx) => {
+      if (celda.trim() !== '' && cIdx > ultimaColConDatos) {
+        ultimaColConDatos = cIdx;
+      }
+    });
+  });
+
+  const numColumnasReales = Math.max(1, ultimaColConDatos + 1);
+
+  return matrizSinFilasVacias.map((fila, fIdx) => {
+    const filaRecortada = fila.slice(0, numColumnasReales);
+    while (filaRecortada.length < numColumnasReales) {
+      filaRecortada.push(fIdx === 0 ? `Columna ${filaRecortada.length + 1}` : '0');
     }
-    return filaNormalizada;
+    // Asegurar que ninguna cabecera de la fila 0 quede vacía
+    if (fIdx === 0) {
+      return filaRecortada.map((celda, cIdx) => celda.trim() || `Columna ${cIdx + 1}`);
+    }
+    return filaRecortada;
   });
 };
 
@@ -694,7 +717,6 @@ export default function AdminPage() {
   } | null>(null);
   const editorContenedorRef = useRef<HTMLElement | null>(null);
 
-  // Estados para crear o importar tabla desde Excel / CSV
   const [modalNuevaTablaAbierto, setModalNuevaTablaAbierto] = useState(false);
   const [nombreNuevaTablaExcel, setNombreNuevaTablaExcel] = useState('Tabla Importada de Excel');
   const [textoPegadoExcelModal, setTextoPegadoExcelModal] = useState('');
@@ -941,6 +963,24 @@ export default function AdminPage() {
       }, 900);
     }, 1800);
   };
+  // FUNCIÓN QUE SINCRONIZA AUTOMÁTICAMENTE TODAS LAS GRÁFICAS DEL LIBRO CUANDO CAMBIA LA ESTRUCTURA DE UNA TABLA
+  const sincronizarGraficasConTabla = (listaPaginas: Pagina[], tablaId: string, nuevaMatriz: string[][]) => {
+    const numCols = nuevaMatriz[0]?.length || 1;
+    listaPaginas.forEach(p => {
+      p.bloques.forEach(b => {
+        if (b.tipo === 'grafica' && b.tablaRef === tablaId) {
+          const ejeXSeguro = Number(b.ejeX) >= 0 && Number(b.ejeX) < numCols ? Number(b.ejeX) : 0;
+          b.ejeX = ejeXSeguro;
+          if (Array.isArray(b.ejesY) && b.ejesY.length > 0) {
+            b.ejesY = b.ejesY
+              .map(Number)
+              .filter(idx => !isNaN(idx) && idx >= 0 && idx < numCols && idx !== ejeXSeguro);
+          }
+        }
+      });
+    });
+  };
+
   // CREAR TABLA NUEVA O REEMPLAZAR TABLA EXISTENTE A PARTIR DE UN BLOQUE PEGADO DESDE EXCEL O ARCHIVO CSV/TXT
   const crearTablaDesdeExcelOCsv = () => {
     const matriz = parsearTextoExcelOCsv(textoPegadoExcelModal);
@@ -957,6 +997,7 @@ export default function AdminPage() {
       ) as BloqueTabla | undefined;
       if (bloqueExistente && bloqueExistente.tipo === 'tabla') {
         bloqueExistente.data = matriz;
+        sincronizarGraficasConTabla(nuevasPaginas, bloqueExistente.id, matriz);
         autoGuardar(nuevasPaginas);
         setModalNuevaTablaAbierto(false);
         setTablaDestinoPegadoMasivoId(null);
@@ -1010,6 +1051,7 @@ export default function AdminPage() {
             ) as BloqueTabla | undefined;
             if (bloqueExistente && bloqueExistente.tipo === 'tabla') {
               bloqueExistente.data = matriz;
+              sincronizarGraficasConTabla(nuevasPaginas, bloqueExistente.id, matriz);
               autoGuardar(nuevasPaginas);
               setModalNuevaTablaAbierto(false);
               setTablaDestinoPegadoMasivoId(null);
@@ -1067,11 +1109,19 @@ export default function AdminPage() {
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTabla;
     if (!bloque || bloque.tipo !== 'tabla') return;
 
+    // Si el usuario pega un rango grande en la celda (0,0), ajustamos exactamente al tamaño del bloque de Excel pegado para no dejar filas/columnas viejas huérfanas
+    if (filaInicio === 0 && colInicio === 0 && matrizClipboard.length >= 2 && (matrizClipboard[0]?.length || 0) >= 2) {
+      bloque.data = matrizClipboard;
+      sincronizarGraficasConTabla(nuevasPaginas, bloque.id, bloque.data);
+      autoGuardar(nuevasPaginas);
+      mostrarMensaje(`¡Tabla reemplazada desde Excel (${matrizClipboard.length} filas × ${matrizClipboard[0]?.length || 0} columnas)! Gráficas sincronizadas.`, 'exito');
+      return;
+    }
+
     const totalColsActuales = bloque.data[0]?.length || 1;
     const filasNecesarias = filaInicio + matrizClipboard.length;
     const colsNecesarias = colInicio + (matrizClipboard[0]?.length || 1);
 
-    // Expandir la matriz de la tabla automáticamente si el rango pegado supera las filas o columnas actuales
     while (bloque.data.length < filasNecesarias) {
       const numCols = bloque.data[0]?.length || totalColsActuales;
       bloque.data.push(Array(numCols).fill('0'));
@@ -1079,11 +1129,10 @@ export default function AdminPage() {
 
     bloque.data.forEach((fila, fIdx) => {
       while (fila.length < colsNecesarias) {
-        fila.push(fIdx === 0 ? `Col_${fila.length + 1}` : '0');
+        fila.push(fIdx === 0 ? `Columna ${fila.length + 1}` : '0');
       }
     });
 
-    // Repartir cada dato en su fila y columna exacta a partir de la celda donde se hizo Ctrl+V
     matrizClipboard.forEach((filaClipboard, rOffset) => {
       const filaDestino = filaInicio + rOffset;
       filaClipboard.forEach((valorCelda, cOffset) => {
@@ -1094,6 +1143,7 @@ export default function AdminPage() {
       });
     });
 
+    sincronizarGraficasConTabla(nuevasPaginas, bloque.id, bloque.data);
     autoGuardar(nuevasPaginas);
     mostrarMensaje(`¡Rango de Excel desglosado en ${matrizClipboard.length} filas × ${matrizClipboard[0]?.length || 0} columnas! Gráficas actualizadas.`, 'exito');
   };
@@ -2317,7 +2367,7 @@ export default function AdminPage() {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId);
     if (bloque && bloque.tipo === 'tabla') {
-      bloque.data = bloque.data.map((fila, i) => [...fila, i === 0 ? 'Nueva Col' : '0']);
+      bloque.data = bloque.data.map((fila, i) => [...fila, i === 0 ? `Columna ${fila.length + 1}` : '0']);
       autoGuardar(nuevasPaginas);
     }
   };
@@ -2328,7 +2378,7 @@ export default function AdminPage() {
     if (bloque && bloque.tipo === 'tabla') {
       bloque.data = bloque.data.map((fila, i) => {
         const copia = [...fila];
-        copia.splice(despuesDeColIndex + 1, 0, i === 0 ? 'Nueva Col' : '0');
+        copia.splice(despuesDeColIndex + 1, 0, i === 0 ? `Columna ${despuesDeColIndex + 2}` : '0');
         return copia;
       });
       autoGuardar(nuevasPaginas);
@@ -2388,6 +2438,7 @@ export default function AdminPage() {
         const b = nuevasPaginas[indicePaginaActual].bloques.find(bl => bl.id === bloqueId) as BloqueTabla;
         if (b && b.tipo === 'tabla') {
           b.data = b.data.map(fila => fila.filter((_, idx) => idx !== colIndex));
+          sincronizarGraficasConTabla(nuevasPaginas, b.id, b.data);
           autoGuardar(nuevasPaginas);
         }
         setModalConfirmacion(prev => ({ ...prev, abierto: false }));
@@ -2736,7 +2787,7 @@ export default function AdminPage() {
 
   const parseValor = (val: any) => {
     if (val === undefined || val === null) return 0;
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'number') return isFinite(val) ? val : 0;
     let s = String(val).trim();
     if (!s) return 0;
     s = s.replace(/[^0-9.,-]/g, '');
@@ -2764,7 +2815,7 @@ export default function AdminPage() {
       }
     }
     const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
+    return isFinite(n) ? n : 0;
   };
 
   const normalizarTexto = (texto: any) => {
@@ -2787,28 +2838,79 @@ export default function AdminPage() {
     return COLORES_GRAFICAS_DEFAULT;
   };
 
+  // FORMATEADOR DE DATOS 100% BLINDADO CONTRA CRASHES DE RECHARTS AL PEGAR DESDE EXCEL
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = todasLasTablasAdmin.find(t => t.id === bloqueGrafica.tablaRef);
-    if (!tablaFuente || !tablaFuente.data || tablaFuente.data.length < 2) return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    if (!tablaFuente || !Array.isArray(tablaFuente.data) || tablaFuente.data.length < 2) {
+      return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
 
-    const cabecerasOriginales = tablaFuente.data[0] || [];
-    const cabeceras = cabecerasOriginales.map((c, i) => String(c || '').trim() || `Columna_${i + 1}`);
-    const filas = tablaFuente.data.slice(1);
+    const cabecerasOriginales = Array.isArray(tablaFuente.data[0]) ? tablaFuente.data[0] : [];
+    const totalColumnas = cabecerasOriginales.length;
+    if (totalColumnas === 0) {
+      return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
 
-    const ejeXSeguro = Number(bloqueGrafica.ejeX) || 0;
-    const ejesYUsar = (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY) && bloqueGrafica.ejesY.length > 0) 
-        ? bloqueGrafica.ejesY.map(Number) 
-        : cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
+    // Recharts interpreta el carácter "." en dataKey como ruta anidada y colapsa la página si una cabecera de Excel tiene abreviaturas (ej. "Ing. Civil" o "No.").
+    // Lo reemplazamos por "․" (U+2024, idéntico visualmente pero seguro para Recharts) y garantizamos unicidad absoluta.
+    const conteoNombres: Record<string, number> = {};
+    const cabeceras = cabecerasOriginales.map((c, i) => {
+      let limpio = String(c ?? '')
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\./g, '․')
+        .replace(/[\[\]]/g, '')
+        .trim();
+      if (!limpio) limpio = `Columna ${i + 1}`;
+      if (conteoNombres[limpio] !== undefined) {
+        conteoNombres[limpio] += 1;
+        limpio = `${limpio} (${conteoNombres[limpio]})`;
+      } else {
+        conteoNombres[limpio] = 1;
+      }
+      return limpio;
+    });
 
-    const indiceMapa = ejesYUsar.length > 0 ? ejesYUsar[0] : 1;
+    // Filtrar filas que estén completamente vacías
+    const filas = tablaFuente.data
+      .slice(1)
+      .filter(f => Array.isArray(f) && f.some(celda => String(celda ?? '').trim() !== ''));
+
+    if (filas.length === 0) {
+      return { datos: [], cabeceras, ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
+
+    const rawEjeX = Number(bloqueGrafica.ejeX);
+    const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
+
+    // Filtrar cualquier índice de eje Y que haya quedado fuera de rango tras pegar una tabla con menos columnas
+    let ejesYValidos: number[] = [];
+    if (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY)) {
+      ejesYValidos = Array.from(
+        new Set(
+          bloqueGrafica.ejesY
+            .map(Number)
+            .filter(idx => !isNaN(idx) && idx >= 0 && idx < totalColumnas && idx !== ejeXSeguro)
+        )
+      );
+    }
+
+    if (ejesYValidos.length === 0) {
+      ejesYValidos = cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
+    }
+    if (ejesYValidos.length === 0) {
+      ejesYValidos = [0];
+    }
+
+    const indiceMapa = ejesYValidos[0] ?? 0;
 
     let detectaPorcentajeGlobal = false;
     const columnasPorcentaje: Record<string, boolean> = {};
 
-    ejesYUsar.forEach(idx => {
+    ejesYValidos.forEach(idx => {
       const nombreCab = cabeceras[idx];
+      if (!nombreCab) return;
       const cabTienePorcentaje = nombreCab.includes('%') || nombreCab.toLowerCase().includes('porcentaje');
-      const filaTienePorcentaje = filas.some(f => String(f[idx] || '').includes('%'));
+      const filaTienePorcentaje = filas.some(f => String(f?.[idx] ?? '').includes('%'));
       if (cabTienePorcentaje || filaTienePorcentaje) {
         columnasPorcentaje[nombreCab] = true;
         detectaPorcentajeGlobal = true;
@@ -2818,45 +2920,66 @@ export default function AdminPage() {
     const paletaBase = obtenerPaletaActivaBloque(bloqueGrafica);
 
     const datosFormateados = filas.map((fila, fIdx) => {
-      const rawVal = String(fila[indiceMapa] || '');
+      const rawVal = String(fila?.[indiceMapa] ?? '');
       const nombreCabMapa = cabeceras[indiceMapa] || '';
       const esPorcMapa = rawVal.includes('%') || !!columnasPorcentaje[nombreCabMapa];
 
       const obj: any = { 
-          name: String(fila[ejeXSeguro] || `Ítem ${fIdx + 1}`).trim(),
-          valorMapa: parseValor(fila[indiceMapa]),
-          esPorcentaje: esPorcMapa,
-          _idx: fIdx,
-          fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
+        name: String(fila?.[ejeXSeguro] ?? `Ítem ${fIdx + 1}`).trim() || `Ítem ${fIdx + 1}`,
+        valorMapa: parseValor(fila?.[indiceMapa]),
+        esPorcentaje: esPorcMapa,
+        _idx: fIdx,
+        fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
       };
-      ejesYUsar.forEach(idx => {
+      ejesYValidos.forEach(idx => {
         const nombreCabecera = cabeceras[idx];
-        obj[nombreCabecera] = parseValor(fila[idx]);
+        if (nombreCabecera) {
+          obj[nombreCabecera] = parseValor(fila?.[idx]);
+        }
       });
       return obj;
     });
 
-    return { datos: datosFormateados, cabeceras, ejesYUsar, sufijoPorcentaje: detectaPorcentajeGlobal, columnasPorcentaje };
+    return { datos: datosFormateados, cabeceras, ejesYUsar: ejesYValidos, sufijoPorcentaje: detectaPorcentajeGlobal, columnasPorcentaje };
   };
 
-  // RENDERIZADOR REAL DE GRÁFICAS CON CONTROL DE DOMINIO Y (INICIO/FIN) Y GROSOR DE BARRAS
+  // RENDERIZADOR REAL DE GRÁFICAS CON VALIDACIÓN SEGURA DE ESCALAS Y DOMINIO NUMÉRICO
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
 
-    const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]);
+    const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]).filter(Boolean);
+    if (nombresEjesY.length === 0) return <div className="p-8 text-center text-stone-400 italic">Selecciona al menos una columna numérica para graficar.</div>;
+
     const nombreY = nombresEjesY[0];
     const unicaSerie = nombresEjesY.length === 1;
     const paletaActiva = obtenerPaletaActivaBloque(bloque);
-    const altoContenedor = Number(bloque.alturaGrafica) || 380;
+    const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
-    const minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && !isNaN(Number(bloque.ejeYMin))
+    // Cálculo seguro del dominio numérico (evita bloqueos si min >= max de los nuevos datos pegados)
+    let maxDatoReal = 0;
+    datos.forEach((d: any) => {
+      nombresEjesY.forEach(n => {
+        const v = Number(d[n]) || 0;
+        if (v > maxDatoReal) maxDatoReal = v;
+      });
+    });
+
+    let minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && isFinite(Number(bloque.ejeYMin))
       ? Number(bloque.ejeYMin)
       : 0;
-    const maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && !isNaN(Number(bloque.ejeYMax))
+    let maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && isFinite(Number(bloque.ejeYMax))
       ? Number(bloque.ejeYMax)
       : 'auto';
+
+    if (typeof maxValConfig === 'number' && minValConfig >= maxValConfig) {
+      minValConfig = 0;
+      maxValConfig = 'auto';
+    } else if (maxValConfig === 'auto' && maxDatoReal > 0 && minValConfig >= maxDatoReal) {
+      minValConfig = 0;
+    }
+
     const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
 
     const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
@@ -2880,9 +3003,9 @@ export default function AdminPage() {
             <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -2892,7 +3015,7 @@ export default function AdminPage() {
                   radius={[6, 6, 0, 0]} 
                   isAnimationActive={false}
                   style={{ cursor: 'pointer' }}
-                  onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre)}
+                  onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre.replace(/․/g, '.'))}
                 >
                   {unicaSerie && datos.map((entry: any, idx: number) => (
                     <Cell 
@@ -2914,10 +3037,10 @@ export default function AdminPage() {
           <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -2927,7 +3050,7 @@ export default function AdminPage() {
                   radius={[0, 6, 6, 0]} 
                   isAnimationActive={false}
                   style={{ cursor: 'pointer' }}
-                  onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre)}
+                  onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre.replace(/․/g, '.'))}
                 >
                   {unicaSerie && datos.map((entry: any, idx: number) => (
                     <Cell 
@@ -2956,9 +3079,9 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -2968,7 +3091,7 @@ export default function AdminPage() {
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={i === nombresEjesY.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]} 
                   style={bloque.tipoGrafica === 'barras_3d_apiladas' ? { filter: `url(#shadowStack-admin-${bloque.id})`, cursor: 'pointer' } : { cursor: 'pointer' }}
-                  onClick={() => abrirSelectorDirecto(i, nombre)}
+                  onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}
                   isAnimationActive={false}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="inside" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#ffffff', fontSize: 11, fontWeight: 'bold' }} />}
@@ -2989,9 +3112,9 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
                 const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 return (
@@ -3002,7 +3125,7 @@ export default function AdminPage() {
                     fill={baseColor} 
                     radius={[12, 12, 4, 4]} 
                     style={{ filter: `url(#shadow4d-admin-${bloque.id})`, cursor: 'pointer' }} 
-                    onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre)}
+                    onClick={(data: any, idx: number) => abrirSelectorDirecto(unicaSerie ? idx : i, unicaSerie ? `${data?.name || `Ítem ${idx + 1}`}` : nombre.replace(/․/g, '.'))}
                     isAnimationActive={false}
                   >
                     {unicaSerie && datos.map((entry: any, idx: number) => (
@@ -3231,9 +3354,9 @@ export default function AdminPage() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={dominioNumerico} allowDataOverflow={true} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis type="number" dataKey={nombreY} name={nombreY.replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter 
                   key={nombre} 
@@ -3241,7 +3364,7 @@ export default function AdminPage() {
                   data={datos} 
                   isAnimationActive={false}
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]}
-                  onClick={() => abrirSelectorDirecto(i, nombre)}
+                  onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
                 </Scatter>
@@ -3257,9 +3380,9 @@ export default function AdminPage() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line 
                   type={bloque.tipoGrafica === 'lineas_curvas' ? 'natural' : 'linear'} 
@@ -3268,8 +3391,8 @@ export default function AdminPage() {
                   stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   strokeWidth={3.5} 
                   dot={{ r: 4, strokeWidth: 2 }} 
-                  activeDot={{ r: 6, onClick: () => abrirSelectorDirecto(i, nombre) }} 
-                  onClick={() => abrirSelectorDirecto(i, nombre)}
+                  activeDot={{ r: 6, onClick: () => abrirSelectorDirecto(i, nombre.replace(/․/g, '.')) }} 
+                  onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}
                   isAnimationActive={false}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -3286,9 +3409,9 @@ export default function AdminPage() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area 
                   type="monotone" 
@@ -3298,7 +3421,7 @@ export default function AdminPage() {
                   stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   fillOpacity={0.65} 
-                  onClick={() => abrirSelectorDirecto(i, nombre)}
+                  onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}
                   isAnimationActive={false}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -3314,20 +3437,20 @@ export default function AdminPage() {
             <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
                 const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 if (i === nombresEjesY.length - 1 && nombresEjesY.length > 1) {
                   return (
-                    <Line key={nombre} type="monotone" dataKey={nombre} stroke={color} strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre)}>
+                    <Line key={nombre} type="monotone" dataKey={nombre} stroke={color} strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}>
                       {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
                     </Line>
                   );
                 }
                 return (
-                  <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre)}>
+                  <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}>
                     {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
                   </Bar>
                 );
@@ -3344,8 +3467,8 @@ export default function AdminPage() {
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#cbd5e1" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
               <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar 
                   key={nombre} 
@@ -3355,7 +3478,7 @@ export default function AdminPage() {
                   strokeWidth={2.5} 
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   fillOpacity={bloque.tipoGrafica === 'radar_relleno' ? 0.75 : 0.45} 
-                  onClick={() => abrirSelectorDirecto(i, nombre)}
+                  onClick={() => abrirSelectorDirecto(i, nombre.replace(/․/g, '.'))}
                   isAnimationActive={false}
                 >
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#1e293b', fontSize: 11, fontWeight: 'bold' }} />}
@@ -3384,7 +3507,7 @@ export default function AdminPage() {
                 style={{ left: tooltipMapa.x, top: tooltipMapa.y }}
               >
                 <span className="block text-[10px] uppercase tracking-widest text-slate-400 font-bold">{tooltipMapa.nombre}</span>
-                <span className="block text-sm font-black text-amber-300">{nombreY || 'Valor'}: {tooltipMapa.valor}</span>
+                <span className="block text-sm font-black text-amber-300">{(nombreY || 'Valor').replace(/․/g, '.')}: {tooltipMapa.valor}</span>
               </div>
             )}
             <div className="w-full" style={{ height: `${altoContenedor}px` }}>
@@ -5805,12 +5928,12 @@ export default function AdminPage() {
                                           {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Ubicación (Departamento/Ciudad)' : 'Eje X (Categorías / Periodos)'}
                                         </label>
                                         <select 
-                                          value={bloque.ejeX} 
+                                          value={Number(bloque.ejeX) < cabeceras.length ? bloque.ejeX : 0} 
                                           onChange={(e) => actualizarGrafica(bloque.id, 'ejeX', Number(e.target.value))}
                                           className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
                                         >
                                           {cabeceras.map((cab, i) => (
-                                            <option key={i} value={i}>{cab || `Columna ${i + 1}`}</option>
+                                            <option key={i} value={i}>{cab.replace(/․/g, '.') || `Columna ${i + 1}`}</option>
                                           ))}
                                         </select>
                                       </div>
@@ -5821,7 +5944,8 @@ export default function AdminPage() {
                                         </label>
                                         <div className="space-y-2 max-h-32 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
                                           {cabeceras.map((cab, i) => {
-                                            if (i === Number(bloque.ejeX)) return null; 
+                                            const ejeXActual = Number(bloque.ejeX) < cabeceras.length ? Number(bloque.ejeX) : 0;
+                                            if (i === ejeXActual) return null; 
                                             const isChecked = (bloque.ejesY || []).includes(i);
                                             return (
                                               <label key={i} className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
@@ -5829,7 +5953,7 @@ export default function AdminPage() {
                                                   type="checkbox" 
                                                   checked={isChecked}
                                                   onChange={(e) => {
-                                                    let nuevosEjesY = [...(bloque.ejesY || [])];
+                                                    let nuevosEjesY = [...(bloque.ejesY || [])].filter(idx => idx < cabeceras.length && idx !== ejeXActual);
                                                     if (e.target.checked) {
                                                       if (bloque.tipoGrafica === 'mapa_colombia') nuevosEjesY = [i];
                                                       else nuevosEjesY.push(i);
@@ -5840,12 +5964,12 @@ export default function AdminPage() {
                                                   }}
                                                   className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                                 />
-                                                {cab || `Columna ${i + 1}`}
+                                                {cab.replace(/․/g, '.') || `Columna ${i + 1}`}
                                               </label>
                                             );
                                           })}
                                           {(!bloque.ejesY || bloque.ejesY.length === 0) && (
-                                            <p className="text-xs text-slate-400 italic">⚠️ El sistema usará la primera columna numérica por defecto.</p>
+                                            <p className="text-xs text-slate-400 italic">⚠️ El sistema usará automáticamente las columnas numéricas disponibles.</p>
                                           )}
                                         </div>
                                       </div>
@@ -6031,7 +6155,7 @@ export default function AdminPage() {
                                           ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                               {ejesYUsar.map((ejeYIdx, idx) => {
-                                                 const nombreEje = cabeceras[ejeYIdx] || `Serie ${idx + 1}`;
+                                                 const nombreEje = (cabeceras[ejeYIdx] || `Serie ${idx + 1}`).replace(/․/g, '.');
                                                  return (
                                                     <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
                                                       <input 
