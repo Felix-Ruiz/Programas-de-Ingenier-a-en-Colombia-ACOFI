@@ -10,7 +10,7 @@ import {
   X, BarChart3, Map as MapIcon, Image as ImageIcon, Palette,
   ArrowUp, ArrowDown, MoveLeft, MoveRight, Upload, Lock, ImagePlus, MousePointerClick,
   PanelLeftClose, PanelLeftOpen, Link2, PenTool, Columns, Search, Download, Printer, FileJson,
-  AlignLeft, AlignCenter, AlignRight, Square
+  AlignLeft, AlignCenter, AlignRight, Square, FileSpreadsheet, ClipboardPaste
 } from 'lucide-react';
 
 import { 
@@ -365,7 +365,6 @@ const ReactQuill = dynamic(
         }
         Quill.register(CustomImage, true);
       }
-      // Permitir que los enlaces conserven style, data-bold, data-underline, data-strike, data-italic y data-internal-page sin que Quill los borre
       const BaseLink = Quill.import('formats/link') as any;
       if (BaseLink) {
         const LINK_ATTRIBUTES = [
@@ -570,6 +569,66 @@ type ConfiguracionEdicion = {
   mostrarPiePaginaGlobal?: boolean;
 };
 
+// FUNCIÓN UNIVERSAL PARA CONVERTIR TEXTO DE EXCEL (TSV) O ARCHIVO CSV EN MATRIZ DE FILAS Y COLUMNAS EXACTA
+const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
+  if (!textoCrudo) return [];
+  const textoSinBom = textoCrudo.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lineas = textoSinBom.split('\n');
+  while (lineas.length > 0 && lineas[lineas.length - 1].trim() === '') {
+    lineas.pop();
+  }
+  if (lineas.length === 0) return [];
+
+  // Detectar si viene de copiar y pegar directo de Excel (usa tabulador \t) o de un archivo CSV (usa ; o ,)
+  const primeraLinea = lineas[0];
+  let delimitador = '\t';
+  if (!primeraLinea.includes('\t')) {
+    const conteoPuntoYComa = (primeraLinea.match(/;/g) || []).length;
+    const conteoComa = (primeraLinea.match(/,/g) || []).length;
+    if (conteoPuntoYComa > 0 || conteoComa > 0) {
+      delimitador = conteoPuntoYComa >= conteoComa ? ';' : ',';
+    }
+  }
+
+  const parsearLinea = (linea: string, sep: string): string[] => {
+    if (sep === '\t') {
+      return linea.split('\t').map(celda => celda.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
+    }
+    const resultado: string[] = [];
+    let actual = '';
+    let enComillas = false;
+    for (let i = 0; i < linea.length; i++) {
+      const char = linea[i];
+      if (char === '"') {
+        if (enComillas && linea[i + 1] === '"') {
+          actual += '"';
+          i++;
+        } else {
+          enComillas = !enComillas;
+        }
+      } else if (char === sep && !enComillas) {
+        resultado.push(actual.trim());
+        actual = '';
+      } else {
+        actual += char;
+      }
+    }
+    resultado.push(actual.trim());
+    return resultado;
+  };
+
+  const matrizCruda = lineas.map(l => parsearLinea(l, delimitador));
+  const maxCols = Math.max(...matrizCruda.map(f => f.length), 1);
+
+  return matrizCruda.map(fila => {
+    const filaNormalizada = [...fila];
+    while (filaNormalizada.length < maxCols) {
+      filaNormalizada.push('');
+    }
+    return filaNormalizada;
+  });
+};
+
 export default function AdminPage() {
   const [sesion, setSesion] = useState<any>(null);
   const [revisandoSesion, setRevisandoSesion] = useState(true);
@@ -635,7 +694,11 @@ export default function AdminPage() {
   } | null>(null);
   const editorContenedorRef = useRef<HTMLElement | null>(null);
 
+  // Estados para crear o importar tabla desde Excel / CSV
   const [modalNuevaTablaAbierto, setModalNuevaTablaAbierto] = useState(false);
+  const [nombreNuevaTablaExcel, setNombreNuevaTablaExcel] = useState('Tabla Importada de Excel');
+  const [textoPegadoExcelModal, setTextoPegadoExcelModal] = useState('');
+  const [tablaDestinoPegadoMasivoId, setTablaDestinoPegadoMasivoId] = useState<string | null>(null);
 
   const [modalImportarJsonAbierto, setModalImportarJsonAbierto] = useState(false);
   const [jsonLoteInput, setJsonLoteInput] = useState('');
@@ -878,6 +941,163 @@ export default function AdminPage() {
       }, 900);
     }, 1800);
   };
+  // CREAR TABLA NUEVA O REEMPLAZAR TABLA EXISTENTE A PARTIR DE UN BLOQUE PEGADO DESDE EXCEL O ARCHIVO CSV/TXT
+  const crearTablaDesdeExcelOCsv = () => {
+    const matriz = parsearTextoExcelOCsv(textoPegadoExcelModal);
+    if (matriz.length === 0) {
+      mostrarMensaje('El texto pegado no tiene un formato tabular válido.', 'error');
+      return;
+    }
+
+    const nuevasPaginas = [...paginas];
+
+    if (tablaDestinoPegadoMasivoId) {
+      const bloqueExistente = nuevasPaginas[indicePaginaActual].bloques.find(
+        b => b.id === tablaDestinoPegadoMasivoId
+      ) as BloqueTabla | undefined;
+      if (bloqueExistente && bloqueExistente.tipo === 'tabla') {
+        bloqueExistente.data = matriz;
+        autoGuardar(nuevasPaginas);
+        setModalNuevaTablaAbierto(false);
+        setTablaDestinoPegadoMasivoId(null);
+        setTextoPegadoExcelModal('');
+        mostrarMensaje(`¡Datos de "${bloqueExistente.nombre}" actualizados (${matriz.length} filas × ${matriz[0]?.length || 0} columnas)! Las gráficas conectadas se han sincronizado.`, 'exito');
+        return;
+      }
+    }
+
+    nuevasPaginas[indicePaginaActual].bloques.push({ 
+      id: generarId(), 
+      tipo: 'tabla', 
+      nombre: nombreNuevaTablaExcel.trim() || 'Tabla Importada de Excel', 
+      data: matriz, 
+      oculto: false, 
+      colorFondo: '#ffffff',
+      escala: 100,
+      coloresFilas: {},
+      coloresColumnas: {},
+      paddingFila: 6,
+      tamanoTextoTabla: 14,
+      anchosColumnas: {},
+      altosFilas: {},
+      pieBloque: ''
+    });
+    autoGuardar(nuevasPaginas);
+    setModalNuevaTablaAbierto(false);
+    setTablaDestinoPegadoMasivoId(null);
+    setTextoPegadoExcelModal('');
+    setNombreNuevaTablaExcel('Tabla Importada de Excel');
+    mostrarMensaje(`¡Tabla con ${matriz.length} filas importada desde Excel con éxito!`, 'exito');
+  };
+
+  // SUBIR ARCHIVO CSV O TXT PARA CREAR O REEMPLAZAR UNA TABLA AUTOMÁTICAMENTE
+  const manejarSubidaArchivoCsvTabla = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const contenido = event.target?.result as string;
+      if (contenido) {
+        const matriz = parsearTextoExcelOCsv(contenido);
+        if (matriz.length > 0) {
+          const nombreArchivo = file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' ');
+          const nuevasPaginas = [...paginas];
+
+          if (tablaDestinoPegadoMasivoId) {
+            const bloqueExistente = nuevasPaginas[indicePaginaActual].bloques.find(
+              b => b.id === tablaDestinoPegadoMasivoId
+            ) as BloqueTabla | undefined;
+            if (bloqueExistente && bloqueExistente.tipo === 'tabla') {
+              bloqueExistente.data = matriz;
+              autoGuardar(nuevasPaginas);
+              setModalNuevaTablaAbierto(false);
+              setTablaDestinoPegadoMasivoId(null);
+              mostrarMensaje(`¡Archivo "${file.name}" volcado en "${bloqueExistente.nombre}" (${matriz.length} filas)!`, 'exito');
+              return;
+            }
+          }
+
+          nuevasPaginas[indicePaginaActual].bloques.push({ 
+            id: generarId(), 
+            tipo: 'tabla', 
+            nombre: nombreArchivo || 'Tabla CSV', 
+            data: matriz, 
+            oculto: false, 
+            colorFondo: '#ffffff',
+            escala: 100,
+            coloresFilas: {},
+            coloresColumnas: {},
+            paddingFila: 6,
+            tamanoTextoTabla: 14,
+            anchosColumnas: {},
+            altosFilas: {},
+            pieBloque: ''
+          });
+          autoGuardar(nuevasPaginas);
+          setModalNuevaTablaAbierto(false);
+          setTablaDestinoPegadoMasivoId(null);
+          mostrarMensaje(`¡Archivo "${file.name}" importado como tabla (${matriz.length} filas)!`, 'exito');
+        } else {
+          mostrarMensaje('El archivo está vacío o no tiene formato tabular.', 'error');
+        }
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  // PEGADO INTELIGENTE (CTRL + V / CMD + V) EN CUALQUIER CELDA DE UNA TABLA EXISTENTE DESDE EXCEL
+  const manejarPegadoExcelEnCelda = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    bloqueId: string,
+    filaInicio: number,
+    colInicio: number
+  ) => {
+    const textoClipboard = e.clipboardData.getData('text');
+    if (!textoClipboard || (!textoClipboard.includes('\t') && !textoClipboard.includes('\n'))) {
+      return; // Si es un texto simple de una sola celda, dejamos que actúe el pegado normal del navegador
+    }
+
+    e.preventDefault();
+    const matrizClipboard = parsearTextoExcelOCsv(textoClipboard);
+    if (matrizClipboard.length === 0) return;
+
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTabla;
+    if (!bloque || bloque.tipo !== 'tabla') return;
+
+    const totalColsActuales = bloque.data[0]?.length || 1;
+    const filasNecesarias = filaInicio + matrizClipboard.length;
+    const colsNecesarias = colInicio + (matrizClipboard[0]?.length || 1);
+
+    // Expandir la matriz de la tabla automáticamente si el rango pegado supera las filas o columnas actuales
+    while (bloque.data.length < filasNecesarias) {
+      const numCols = bloque.data[0]?.length || totalColsActuales;
+      bloque.data.push(Array(numCols).fill('0'));
+    }
+
+    bloque.data.forEach((fila, fIdx) => {
+      while (fila.length < colsNecesarias) {
+        fila.push(fIdx === 0 ? `Col_${fila.length + 1}` : '0');
+      }
+    });
+
+    // Repartir cada dato en su fila y columna exacta a partir de la celda donde se hizo Ctrl+V
+    matrizClipboard.forEach((filaClipboard, rOffset) => {
+      const filaDestino = filaInicio + rOffset;
+      filaClipboard.forEach((valorCelda, cOffset) => {
+        const colDestino = colInicio + cOffset;
+        if (bloque.data[filaDestino] && bloque.data[filaDestino][colDestino] !== undefined) {
+          bloque.data[filaDestino][colDestino] = valorCelda;
+        }
+      });
+    });
+
+    autoGuardar(nuevasPaginas);
+    mostrarMensaje(`¡Rango de Excel desglosado en ${matrizClipboard.length} filas × ${matrizClipboard[0]?.length || 0} columnas! Gráficas actualizadas.`, 'exito');
+  };
+
   // FUNCIÓN DEL INYECTOR DE LOTES JSON INTELIGENTE
   const procesarInyeccionLoteJson = () => {
     if (!jsonLoteInput.trim()) {
@@ -1182,7 +1402,6 @@ export default function AdminPage() {
     }
   };
 
-  // Subida de imagen de fondo exclusiva para la página activa (igual que en la portada)
   const manejarSubidaImagenFondoPagina = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !edicionActiva || !paginas[indicePaginaActual]) return;
@@ -1735,6 +1954,7 @@ export default function AdminPage() {
     });
     autoGuardar(nuevasPaginas);
     setModalNuevaTablaAbierto(false);
+    setTablaDestinoPegadoMasivoId(null);
     mostrarMensaje('Tabla en blanco insertada', 'exito');
   };
 
@@ -1760,10 +1980,21 @@ export default function AdminPage() {
     nuevasPaginas[indicePaginaActual].bloques.push(nuevaTabla);
     autoGuardar(nuevasPaginas);
     setModalNuevaTablaAbierto(false);
+    setTablaDestinoPegadoMasivoId(null);
     mostrarMensaje(`Tabla "${tablaOrigen.nombre}" clonada con éxito`, 'exito');
   };
 
   const agregarBloqueTabla = () => {
+    setTablaDestinoPegadoMasivoId(null);
+    setTextoPegadoExcelModal('');
+    setNombreNuevaTablaExcel('Tabla Importada de Excel');
+    setModalNuevaTablaAbierto(true);
+  };
+
+  const abrirPegadoMasivoParaTablaExistente = (tabla: BloqueTabla) => {
+    setTablaDestinoPegadoMasivoId(tabla.id);
+    setNombreNuevaTablaExcel(tabla.nombre || 'Tabla');
+    setTextoPegadoExcelModal('');
     setModalNuevaTablaAbierto(true);
   };
 
@@ -2294,7 +2525,6 @@ export default function AdminPage() {
         const range = rangoSeleccionRef.current;
         const textoSombreado = (textoManual.trim() || range.toString() || seleccionTextoActiva.texto).trim();
 
-        // Si el usuario seleccionó un texto que ya estaba dentro de un <a>, <strong> o <u>, desenvolvemos esos padres si desactivó el formato
         let nodoAncestro: Node | null = range.commonAncestorContainer;
         if (nodoAncestro.nodeType === Node.TEXT_NODE) {
           nodoAncestro = nodoAncestro.parentElement;
@@ -2325,7 +2555,6 @@ export default function AdminPage() {
           range.insertNode(aElem);
         }
 
-        // Si desactivó negrita y había un <strong> o <b> envolviendo únicamente este enlace, lo limpiamos
         if (!conNegrita && aElem.parentElement && (aElem.parentElement.tagName === 'STRONG' || aElem.parentElement.tagName === 'B')) {
           const parentStrong = aElem.parentElement;
           if (parentStrong.childNodes.length === 1) {
@@ -2362,7 +2591,6 @@ export default function AdminPage() {
     const tagEnlace = `<a href="${hrefFinal}" ${attrsExtra} ${attrsDatos} style="${estiloLink}">${textoUsar}</a>`;
 
     if (textoUsar && htmlActual.includes(textoUsar)) {
-      // Reemplaza tanto si ya estaba enlazado como si estaba en texto plano
       const escapado = textoUsar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regexEnlacePrevio = new RegExp(`<a\\b[^>]*>\\s*${escapado}\\s*<\\/a>`, 'i');
       if (regexEnlacePrevio.test(htmlActual)) {
@@ -2623,7 +2851,6 @@ export default function AdminPage() {
     const altoContenedor = Number(bloque.alturaGrafica) || 380;
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
-    // Cálculo del dominio personalizado (Valor mínimo desde donde inicia la gráfica y valor máximo)
     const minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && !isNaN(Number(bloque.ejeYMin))
       ? Number(bloque.ejeYMin)
       : 0;
@@ -2632,7 +2859,6 @@ export default function AdminPage() {
       : 'auto';
     const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
 
-    // Grosor de barras personalizado y espacio entre categorías
     const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
     const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
 
@@ -3226,8 +3452,7 @@ export default function AdminPage() {
       .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
       .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
 
-    // Reconstruir los estilos inline de cualquier <a data-custom-link="true"> para garantizar que Negrita, Subrayado, Tachado y Cursiva se respeten siempre
-    const htmlConLinksForzados = htmlConSaltosPreservados.replace(/<a\b([^>]*data-custom-link="true"[^>]*)>/gi, (fullMatch, attrs) => {
+    const htmlConLinksForzados = htmlConSaltosPreservados.replace(/<a\b([^>]*data-custom-link="true"[^>]*)>/gi, (_, attrs) => {
       const boldMatch = attrs.match(/data-bold="([^"]*)"/i);
       const underMatch = attrs.match(/data-underline="([^"]*)"/i);
       const strikeMatch = attrs.match(/data-strike="([^"]*)"/i);
@@ -4234,6 +4459,14 @@ export default function AdminPage() {
                               <>
                                 <button
                                   type="button"
+                                  onClick={() => abrirPegadoMasivoParaTablaExistente(bloque)}
+                                  className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-2.5 py-1 rounded-lg border border-emerald-200 text-[11px] font-bold transition-colors shadow-xs cursor-pointer"
+                                  title="Pegar una tabla completa desde Excel o subir archivo CSV para actualizar esta tabla"
+                                >
+                                  <FileSpreadsheet size={12} /> Pegar desde Excel / CSV
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => clonarTablaExistente(bloque)}
                                   className="flex items-center gap-1.5 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-bold transition-colors shadow-xs cursor-pointer"
                                   title="Duplicar esta tabla en esta misma página"
@@ -5211,10 +5444,10 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* TABLA CON VISTA PREVIA ULTRA COMPACTA REAL Y PIE DE TABLA INTEGRADO */}
+                          {/* TABLA CON SOPORTE DE PEGADO INTELIGENTE (CTRL+V) DESDE EXCEL EN CUALQUIER CELDA */}
                           {bloque.tipo === 'tabla' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
-                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                                 <input 
                                   type="text" 
                                   value={bloque.nombre} 
@@ -5227,14 +5460,28 @@ export default function AdminPage() {
                                   placeholder="Título de la tabla (Ej. Datos Ing. Civil)"
                                 />
                                 
-                                <button 
-                                  onClick={() => alternarVisibilidadTabla(bloque.id)}
-                                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${bloque.oculto ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                >
-                                  {bloque.oculto ? <EyeOff size={16} /> : <Eye size={16} />}
-                                  {bloque.oculto ? 'Tabla Oculta' : 'Tabla Visible'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirPegadoMasivoParaTablaExistente(bloque)}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer"
+                                    title="Pegar un bloque completo de Excel o subir un CSV para reemplazar los datos de esta tabla"
+                                  >
+                                    <ClipboardPaste size={15} /> Pegar Tabla de Excel
+                                  </button>
+                                  <button 
+                                    onClick={() => alternarVisibilidadTabla(bloque.id)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${bloque.oculto ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                  >
+                                    {bloque.oculto ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    {bloque.oculto ? 'Tabla Oculta' : 'Tabla Visible'}
+                                  </button>
+                                </div>
                               </div>
+
+                              <p className="text-[11px] text-slate-400 mb-3 flex items-center gap-1.5">
+                                💡 <strong>Tip Excel:</strong> Puedes copiar cualquier rango de celdas en Excel, hacer clic en la primera celda (o donde quieras empezar) y presionar <strong>Ctrl + V</strong> (o Cmd + V); las filas y columnas se desglosarán automáticamente.
+                              </p>
                               
                               <div 
                                 className="overflow-x-auto border border-slate-200 rounded-xl mx-auto transition-all"
@@ -5368,6 +5615,7 @@ export default function AdminPage() {
                                                   type="text" 
                                                   value={celda} 
                                                   onChange={(e) => actualizarCeldaTabla(bloque.id, fIndex, cIndex, e.target.value)}
+                                                  onPaste={(e) => manejarPegadoExcelEnCelda(e, bloque.id, fIndex, cIndex)}
                                                   style={{ 
                                                     backgroundColor: 'transparent',
                                                     fontSize: `${fontSizeCelda}px`,
@@ -5474,7 +5722,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* CONFIGURADOR DE GRÁFICAS (CON SELECTOR DE PALETAS, ALTURA VERTICAL, GROSOR DE BARRAS, VALOR MÍNIMO/MÁXIMO EJE Y Y DIAGNÓSTICO GEOESPACIAL) */}
+                          {/* CONFIGURADOR DE GRÁFICAS */}
                           {bloque.tipo === 'grafica' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <input 
@@ -5602,7 +5850,6 @@ export default function AdminPage() {
                                         </div>
                                       </div>
 
-                                      {/* 3 CHECKBOXES DE VISIBILIDAD: VALORES FIJOS, OCULTAR NOMBRES EJE X Y OCULTAR LEYENDA INFERIOR */}
                                       <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
                                         <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 transition-colors shadow-xs">
                                           <input
@@ -5704,7 +5951,6 @@ export default function AdminPage() {
                                         </div>
                                       </div>
 
-                                      {/* SLIDER PARA CAMBIAR LA ALTURA INTERNA DE LA GRÁFICA */}
                                       <div className="col-span-1 md:col-span-2 bg-white p-4 rounded-xl border border-slate-200">
                                         <label className="flex justify-between text-xs font-bold text-slate-700 uppercase mb-2">
                                           <span>Tamaño / Altura de la Gráfica dentro del Bloque</span>
@@ -5721,7 +5967,6 @@ export default function AdminPage() {
                                         />
                                       </div>
 
-                                      {/* SELECTOR DE PALETA / TEMA DE COLORES Y PERSONALIZACIÓN INDIVIDUAL */}
                                       <div className="col-span-1 md:col-span-2 mt-2 pt-6 border-t border-slate-200 space-y-5">
                                         <div className="bg-white p-4 rounded-xl border border-slate-200">
                                           <label className="block text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">
@@ -6019,52 +6264,119 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODAL PARA ELEGIR ENTRE CREAR TABLA EN BLANCO O CLONAR TABLA EXISTENTE */}
+      {/* MODAL PARA CREAR TABLA EN BLANCO, PEGAR DESDE EXCEL / SUBIR CSV O CLONAR TABLA EXISTENTE */}
       {modalNuevaTablaAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalNuevaTablaAbierto(false)}></div>
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
-            <div className="h-2 w-full bg-emerald-500"></div>
-            <div className="p-8">
-              <div className="flex justify-between items-start mb-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => { setModalNuevaTablaAbierto(false); setTablaDestinoPegadoMasivoId(null); }}></div>
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="h-2 w-full bg-emerald-500 shrink-0"></div>
+            <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+              <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <TableIcon size={22} className="text-emerald-600" /> Insertar Bloque de Tabla
+                    <TableIcon size={22} className="text-emerald-600" />
+                    {tablaDestinoPegadoMasivoId ? `Actualizar Tabla desde Excel / CSV` : `Insertar Bloque de Tabla`}
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1">Elige si deseas comenzar una tabla desde cero o clonar una tabla existente.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {tablaDestinoPegadoMasivoId
+                      ? 'Pega las celdas copiadas de Excel o sube un archivo CSV para actualizar todas las filas y columnas automáticamente.'
+                      : 'Crea una tabla en blanco, pega directamente una tabla de Excel / CSV o clona una existente.'}
+                  </p>
                 </div>
-                <button onClick={() => setModalNuevaTablaAbierto(false)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={20} /></button>
+                <button onClick={() => { setModalNuevaTablaAbierto(false); setTablaDestinoPegadoMasivoId(null); }} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={20} /></button>
               </div>
 
-              <div className="space-y-6 mt-6">
+              {!tablaDestinoPegadoMasivoId && (
                 <button
                   type="button"
                   onClick={crearTablaEnBlanco}
-                  className="w-full p-5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100/70 text-left transition-all flex items-center justify-between group cursor-pointer"
+                  className="w-full p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100/70 text-left transition-all flex items-center justify-between group cursor-pointer"
                 >
                   <div>
-                    <span className="block font-black text-emerald-950 text-base">Crear Tabla en Blanco desde Cero</span>
+                    <span className="block font-black text-emerald-950 text-base">1. Crear Tabla en Blanco desde Cero</span>
                     <span className="block text-xs text-emerald-700 mt-0.5">Inicia una tabla nueva estándar de 4 columnas lista para editar.</span>
                   </div>
-                  <div className="p-3 bg-emerald-600 text-white rounded-xl group-hover:scale-105 transition-transform">
-                    <Plus size={20} />
+                  <div className="p-2.5 bg-emerald-600 text-white rounded-xl group-hover:scale-105 transition-transform">
+                    <Plus size={18} />
                   </div>
                 </button>
+              )}
 
+              {/* OPCIÓN ESTRELLA: PEGAR DIRECTAMENTE DESDE EXCEL O SUBIR ARCHIVO CSV */}
+              <div className="p-5 rounded-2xl border-2 border-blue-200 bg-blue-50/40 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-black uppercase tracking-widest text-blue-800 flex items-center gap-2">
+                    <FileSpreadsheet size={16} className="text-blue-600" />
+                    {tablaDestinoPegadoMasivoId ? 'Pegar Celdas de Excel o Subir CSV' : '2. Importar / Pegar Tabla Exacta desde Excel o CSV'}
+                  </span>
+
+                  <div className="relative inline-block">
+                    <input
+                      type="file"
+                      accept=".csv,.txt,.tsv"
+                      onChange={manejarSubidaArchivoCsvTabla}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <button type="button" className="px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer">
+                      <Upload size={13} /> Subir Archivo .CSV / .TXT
+                    </button>
+                  </div>
+                </div>
+
+                {!tablaDestinoPegadoMasivoId && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Título para la nueva tabla</label>
+                    <input
+                      type="text"
+                      value={nombreNuevaTablaExcel}
+                      onChange={(e) => setNombreNuevaTablaExcel(e.target.value)}
+                      placeholder="Ej: Evolución de Matriculados 2012-2024"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Selecciona y copia las celdas en tu Excel (Ctrl+C) y pégalas aquí abajo (Ctrl+V):
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={textoPegadoExcelModal}
+                    onChange={(e) => setTextoPegadoExcelModal(e.target.value)}
+                    placeholder={`Ejemplo al pegar desde Excel:\nPeriodo\tMatriculados\tOficial\tPrivada\n2022-2\t355420\t195100\t160320\n2023-2\t374800\t208300\t166500\n2024-2\t395120\t223400\t171720`}
+                    className="w-full p-3.5 bg-white font-mono text-xs text-slate-800 rounded-xl border border-slate-300 outline-none focus:border-blue-600 custom-scrollbar"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={crearTablaDesdeExcelOCsv}
+                    disabled={!textoPegadoExcelModal.trim()}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-black rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <ClipboardPaste size={15} />
+                    {tablaDestinoPegadoMasivoId ? 'Reemplazar Datos y Actualizar Gráficas' : 'Crear Tabla con estos Datos de Excel'}
+                  </button>
+                </div>
+              </div>
+
+              {!tablaDestinoPegadoMasivoId && (
                 <div className="border-t border-slate-200 pt-5">
                   <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-                    O Clonar / Duplicar una Tabla Existente ({todasLasTablasAdmin.length})
+                    3. O Clonar / Duplicar una Tabla Existente ({todasLasTablasAdmin.length})
                   </h4>
                   {todasLasTablasAdmin.length === 0 ? (
                     <div className="p-6 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-400">
                       Aún no hay otras tablas creadas en esta edición para clonar.
                     </div>
                   ) : (
-                    <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                       {todasLasTablasAdmin.map((t) => (
                         <div
                           key={t.id}
-                          className="p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 bg-white flex items-center justify-between gap-4 transition-all"
+                          className="p-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white flex items-center justify-between gap-4 transition-all"
                         >
                           <div className="min-w-0">
                             <p className="font-bold text-sm text-slate-800 truncate">{t.nombre || 'Tabla sin título'}</p>
@@ -6075,7 +6387,7 @@ export default function AdminPage() {
                           <button
                             type="button"
                             onClick={() => clonarTablaExistente(t)}
-                            className="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                            className="shrink-0 px-4 py-2 bg-slate-800 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                           >
                             <Copy size={13} /> Clonar esta
                           </button>
@@ -6084,10 +6396,10 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              <div className="flex justify-end mt-6 pt-4 border-t border-slate-100">
-                <button onClick={() => setModalNuevaTablaAbierto(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 text-sm transition-colors cursor-pointer">
+              <div className="flex justify-end pt-3 border-t border-slate-100">
+                <button onClick={() => { setModalNuevaTablaAbierto(false); setTablaDestinoPegadoMasivoId(null); }} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 text-sm transition-colors cursor-pointer">
                   Cancelar
                 </button>
               </div>
