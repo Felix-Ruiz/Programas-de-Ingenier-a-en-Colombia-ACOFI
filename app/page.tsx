@@ -136,13 +136,39 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
     word-break: normal !important;
     white-space: normal !important;
   }
-  .prose a:not([data-inline-btn="true"]) {
+  /* Enlaces estándar (cuando no fueron configurados con el panel personalizado) */
+  .prose a:not([data-inline-btn="true"]):not([data-custom-link="true"]) {
     color: #1d4ed8;
     font-weight: 700;
     transition: opacity 0.2s ease;
   }
+  /* Enlaces personalizados: respetan exactamente si el usuario activó o desactivó Negrita, Cursiva, Subrayado y Tachado */
   .prose a[data-custom-link="true"] {
     transition: opacity 0.2s ease;
+  }
+  .prose a[data-bold="true"] {
+    font-weight: 700 !important;
+  }
+  .prose a[data-bold="false"] {
+    font-weight: 400 !important;
+  }
+  .prose a[data-italic="true"] {
+    font-style: italic !important;
+  }
+  .prose a[data-italic="false"] {
+    font-style: normal !important;
+  }
+  .prose a[data-underline="true"][data-strike="true"] {
+    text-decoration: underline line-through !important;
+  }
+  .prose a[data-underline="true"]:not([data-strike="true"]) {
+    text-decoration: underline !important;
+  }
+  .prose a[data-underline="false"][data-strike="true"] {
+    text-decoration: line-through !important;
+  }
+  .prose a[data-underline="false"]:not([data-strike="true"]) {
+    text-decoration: none !important;
   }
   .prose a:hover {
     opacity: 0.8;
@@ -355,6 +381,10 @@ type BloqueGrafica = BloqueBase & {
   ocultarEjeX?: boolean;
   ocultarLeyenda?: boolean;
   alturaGrafica?: number;
+  grosorBarra?: number;
+  espacioEntreBarras?: number;
+  ejeYMin?: number | string;
+  ejeYMax?: number | string;
   pieBloque?: string;
 };
 
@@ -388,6 +418,8 @@ type Pagina = {
   piePaginaHtml?: string;
   bloques: Bloque[]; 
   colorFondo?: string; 
+  imagenFondo?: string;
+  opacidadFondo?: number;
 };
 
 type ConfiguracionEdicion = {
@@ -462,7 +494,6 @@ function LibroPublicoContent() {
   
   const [tooltipMapa, setTooltipMapa] = useState<{ nombre: string; valor: string; x: number; y: number } | null>(null);
 
-  // GeoJSON de Colombia precargado en memoria para garantizar renderizado inmediato en vista normal y en PDF
   const [colombiaGeoJson, setColombiaGeoJson] = useState<any>(null);
 
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
@@ -481,7 +512,6 @@ function LibroPublicoContent() {
   const [touchEnd, setTouchEnd] = useState<{ x: number, y: number } | null>(null);
   const minSwipeDistance = 50; 
 
-  // PALETA POR DEFECTO: COLORES SECUNDARIOS
   const COLORES_GRAFICAS_DEFAULT = PALETAS_GRAFICAS.secundarios.colores;
 
   useEffect(() => {
@@ -1083,6 +1113,19 @@ function LibroPublicoContent() {
     const altoContenedor = Number(bloque.alturaGrafica) || 380;
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
+    // Cálculo del dominio personalizado (Valor mínimo desde donde inicia la gráfica y valor máximo)
+    const minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && !isNaN(Number(bloque.ejeYMin))
+      ? Number(bloque.ejeYMin)
+      : 0;
+    const maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && !isNaN(Number(bloque.ejeYMax))
+      ? Number(bloque.ejeYMax)
+      : 'auto';
+    const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
+
+    // Grosor de barras personalizado y espacio entre categorías
+    const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
+    const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
+
     const formatearEtiqueta = (v: any, nombreSerie?: string) => {
       const num = Number(v);
       if (isNaN(num)) return String(v);
@@ -1094,14 +1137,14 @@ function LibroPublicoContent() {
       case 'barras':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
-                <Bar key={nombre} dataKey={nombre} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[6, 6, 0, 0]} isAnimationActive={false}>
+                <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
                     <Cell key={`cell-bar-${idx}`} fill={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} />
                   ))}
@@ -1115,14 +1158,14 @@ function LibroPublicoContent() {
       case 'barras_horizontales':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart layout="vertical" data={datos} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
+            <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
-                <Bar key={nombre} dataKey={nombre} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[0, 6, 6, 0]} isAnimationActive={false}>
+                <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[0, 6, 6, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
                     <Cell key={`cell-hbar-${idx}`} fill={bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length]} />
                   ))}
@@ -1137,7 +1180,7 @@ function LibroPublicoContent() {
       case 'barras_3d_apiladas':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadowStack-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="3" dy="5" stdDeviation="3" floodColor="#000000" floodOpacity="0.22" />
@@ -1145,7 +1188,7 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1153,6 +1196,7 @@ function LibroPublicoContent() {
                   key={nombre} 
                   dataKey={nombre} 
                   stackId="a" 
+                  barSize={barSizeProp}
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={i === nombresEjesY.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]} 
                   style={bloque.tipoGrafica === 'barras_3d_apiladas' ? { filter: `url(#shadowStack-${bloque.id})` } : undefined}
@@ -1168,7 +1212,7 @@ function LibroPublicoContent() {
       case 'barras_4d':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadow4d-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="4" dy="6" stdDeviation="4" floodColor="#000000" floodOpacity="0.25" />
@@ -1176,7 +1220,7 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
@@ -1185,6 +1229,7 @@ function LibroPublicoContent() {
                   <Bar 
                     key={nombre} 
                     dataKey={nombre} 
+                    barSize={barSizeProp}
                     fill={baseColor} 
                     radius={[12, 12, 4, 4]} 
                     style={{ filter: `url(#shadow4d-${bloque.id})` }}
@@ -1350,7 +1395,7 @@ function LibroPublicoContent() {
       case 'barras_radiales':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="95%" barSize={22} data={datos}>
+            <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="95%" barSize={barSizeProp || 22} data={datos}>
               <RadialBar background dataKey={nombreY} cornerRadius={10} isAnimationActive={false}>
                 {bloque.mostrarValores && <LabelList position="insideStart" fill="#1e293b" fontSize={11} fontWeight="bold" formatter={(v: any) => formatearEtiqueta(v, nombreY)} />}
               </RadialBar>
@@ -1396,7 +1441,7 @@ function LibroPublicoContent() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={[0, 'auto']} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={dominioNumerico} allowDataOverflow={true} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1415,7 +1460,7 @@ function LibroPublicoContent() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1434,7 +1479,7 @@ function LibroPublicoContent() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1449,10 +1494,10 @@ function LibroPublicoContent() {
       case 'combinada':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <ComposedChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
@@ -1465,7 +1510,7 @@ function LibroPublicoContent() {
                   );
                 }
                 return (
-                  <Bar key={nombre} dataKey={nombre} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false}>
+                  <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                     {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
                   </Bar>
                 );
@@ -1481,7 +1526,7 @@ function LibroPublicoContent() {
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={datos}>
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#e7e5e4" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#78716c', fontSize: 12 }} />}
-              <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fill: '#a8a29e', fontSize: 10 }} />
+              <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#a8a29e', fontSize: 10 }} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1576,7 +1621,7 @@ function LibroPublicoContent() {
     }
   };
 
-  // RENDERIZADOR INFALIBLE: CONVIERTE &nbsp; EN ESPACIOS NORMALES Y RENDERIZA BOTONES CON TAMAÑO Y TIPO DE LETRA PERSONALIZADOS
+  // RENDERIZADOR INFALIBLE: RECONSTRUYE LOS ESTILOS DE ENLACES PERSONALIZADOS (NEGRITA, CURSIVA, SUBRAYADO, TACHADO) Y BOTONES INLINE
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
 
@@ -1585,7 +1630,33 @@ function LibroPublicoContent() {
       .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
       .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
 
-    return htmlConSaltosPreservados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
+    // Reconstruir los estilos inline de cualquier <a data-custom-link="true"> para respetar siempre si Negrita o Subrayado están desactivados
+    const htmlConLinksForzados = htmlConSaltosPreservados.replace(/<a\b([^>]*data-custom-link="true"[^>]*)>/gi, (_, attrs) => {
+      const boldMatch = attrs.match(/data-bold="([^"]*)"/i);
+      const underMatch = attrs.match(/data-underline="([^"]*)"/i);
+      const strikeMatch = attrs.match(/data-strike="([^"]*)"/i);
+      const italicMatch = attrs.match(/data-italic="([^"]*)"/i);
+      const colorMatch = attrs.match(/data-color="([^"]*)"/i);
+
+      const esBold = boldMatch ? boldMatch[1] === 'true' : true;
+      const esUnder = underMatch ? underMatch[1] === 'true' : true;
+      const esStrike = strikeMatch ? strikeMatch[1] === 'true' : false;
+      const esItalic = italicMatch ? italicMatch[1] === 'true' : false;
+      const colorHex = colorMatch ? colorMatch[1] : '#1d4ed8';
+
+      const decos: string[] = [];
+      if (esUnder) decos.push('underline');
+      if (esStrike) decos.push('line-through');
+      const decoCss = decos.length > 0 ? decos.join(' ') : 'none';
+      const weightCss = esBold ? '700' : '400';
+      const italicCss = esItalic ? 'italic' : 'normal';
+
+      const styleForzado = `color: ${colorHex} !important; font-weight: ${weightCss} !important; font-style: ${italicCss} !important; text-decoration: ${decoCss} !important; cursor: pointer;`;
+      const attrsSinStyle = attrs.replace(/\s*style="[^"]*"/gi, '');
+      return `<a ${attrsSinStyle} style="${styleForzado}">`;
+    });
+
+    return htmlConLinksForzados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
       const limpio = String(contenidoInterno)
         .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
@@ -1679,7 +1750,7 @@ function LibroPublicoContent() {
     >
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_FUENTES_PUBLICO }} />
 
-      {/* MODO DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF (SIN TÍTULOS HUÉRFANOS Y CON MAPAS RENDERIZADOS) */}
+      {/* MODO DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF (CON SOPORTE DE IMAGEN DE FONDO EN PORTADA Y EN CADA PÁGINA) */}
       {generandoPdfPublico && (
         <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
           <div className="max-w-5xl mx-auto">
@@ -1691,23 +1762,31 @@ function LibroPublicoContent() {
                     className="print-page-sheet flex flex-col items-center justify-center text-center px-10 py-24 relative" 
                     style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}
                   >
-                    {configuracion.logoUrl && (
-                      <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
+                    {configuracion.imagenFondoPortada && (
+                      <div className="absolute inset-0 z-0 overflow-hidden">
+                        <img src={configuracion.imagenFondoPortada} alt="Fondo Portada" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0" style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }} />
+                      </div>
                     )}
-                    <div className="w-16 h-1 mb-10" style={{ backgroundColor: edicionActiva.color_principal || '#1d4ed8' }}></div>
-                    {configuracion.portadaContenido ? (
-                      <div 
-                        className="w-full prose prose-stone max-w-none [&_h1]:text-5xl [&_h1]:font-normal [&_h1]:mb-6 [&_p]:text-xl [&_p]:italic [&_p]:text-stone-600"
-                        dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido) }}
-                      />
-                    ) : (
-                      <>
-                        <h1 className="text-5xl font-normal mb-6">{edicionActiva.titulo}</h1>
-                        <p className="text-xl italic text-stone-500 mb-12">{configuracion.subtitulo}</p>
-                      </>
-                    )}
-                    <div className="mt-16 flex flex-col items-center">
-                      <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400">ACOFI / Edición Oficial {edicionActiva.anio}</span>
+                    <div className="relative z-10 flex flex-col items-center w-full">
+                      {configuracion.logoUrl && (
+                        <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
+                      )}
+                      <div className="w-16 h-1 mb-10" style={{ backgroundColor: edicionActiva.color_principal || '#1d4ed8' }}></div>
+                      {configuracion.portadaContenido ? (
+                        <div 
+                          className="w-full prose prose-stone max-w-none [&_h1]:text-5xl [&_h1]:font-normal [&_h1]:mb-6 [&_p]:text-xl [&_p]:italic [&_p]:text-stone-600"
+                          dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido) }}
+                        />
+                      ) : (
+                        <>
+                          <h1 className="text-5xl font-normal mb-6">{edicionActiva.titulo}</h1>
+                          <p className="text-xl italic text-stone-500 mb-12">{configuracion.subtitulo}</p>
+                        </>
+                      )}
+                      <div className="mt-16 flex flex-col items-center">
+                        <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400">ACOFI / Edición Oficial {edicionActiva.anio}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1727,137 +1806,151 @@ function LibroPublicoContent() {
                 : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
 
               return (
-                <div key={`pdf-pag-${p.id}`} className="print-page-sheet flex flex-col" style={{ backgroundColor: p.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7' }}>
-                  {cabeceraMostrarPdf && (
-                    <div className="mb-4 pb-2 border-b border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-80 print-header-keep" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrarPdf) }} />
-                  )}
-                  {(tieneT || tieneSub) && (
-                    <div className="mb-6 border-b border-stone-200/60 pb-4 print-header-keep">
-                      <div className="flex items-center gap-4">
-                        {mostrarNum && <span className="text-4xl font-black opacity-30">{sec.numeroReal}.</span>}
-                        {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
-                      </div>
-                      {tieneSub && <p className="text-base text-stone-500 font-serif italic mt-2">{p.subtitulo}</p>}
+                <div key={`pdf-pag-${p.id}`} className="print-page-sheet flex flex-col relative" style={{ backgroundColor: p.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7' }}>
+                  {p.imagenFondo && (
+                    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                      <img src={p.imagenFondo} alt="Fondo Página" className="w-full h-full object-cover" />
+                      <div 
+                        className="absolute inset-0" 
+                        style={{ 
+                          backgroundColor: p.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+                          opacity: (p.opacidadFondo ?? 85) / 100
+                        }} 
+                      />
                     </div>
                   )}
-                  <div className="space-y-6 flex-1">
-                    {p.bloques.map((b) => (
-                      <div key={b.id} className={`w-full ${b.tipo === 'grafica' || b.tipo === 'firma' || b.tipo === 'imagen' ? 'print-avoid-break' : ''}`}>
-                        {b.tipo === 'texto' && (
-                          b.columnas === 2 || b.columnas === 3 ? (
-                            <div 
-                              className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
-                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
-                            >
-                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
-                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
-                              {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
-                            </div>
-                          ) : (
-                            <div 
-                              className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
-                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
-                              dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
-                            />
-                          )
-                        )}
-                        {b.tipo === 'firma' && (
-                          <div 
-                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-12 items-start ${
-                              b.alineacion === 'centro' ? 'justify-center text-center' :
-                              b.alineacion === 'derecha' ? 'justify-end text-right' :
-                              b.alineacion === 'espaciado' ? 'justify-around text-left' :
-                              'justify-start text-left'
-                            }`}
-                            style={{ 
-                              backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
-                              paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
-                              paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
-                            }}
-                          >
-                            {(b.firmas || []).map((f, i) => (
-                              <div 
-                                key={i} 
-                                className="flex flex-col space-y-1 min-w-52"
-                                style={{ transform: `translateY(${f.espacioSuperior ?? 0}px)` }}
-                              >
-                                {f.url && (
-                                  <div className={`mb-2 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                                    <img 
-                                      src={f.url} 
-                                      alt={f.nombre} 
-                                      style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
-                                      className="object-contain" 
-                                    />
-                                  </div>
-                                )}
-                                <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
-                                {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
-                                {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {b.tipo === 'boton' && (() => {
-                          const szBtn = obtenerEstilosTamanoBoton(b.tamanoBoton);
-                          const famBtn = NOMBRES_FUENTES_WORD[b.fuenteBoton || 'arial']?.family || 'sans-serif';
-                          return (
-                            <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                              <span
-                                style={{
-                                  backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
-                                  color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
-                                  borderColor: b.colorBoton,
-                                  padding: szBtn.padding,
-                                  fontSize: szBtn.fontSize,
-                                  fontFamily: famBtn,
-                                  boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
-                                }}
-                                className={`font-black uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
-                              >
-                                {b.texto}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {b.tipo === 'tabla' && !b.oculto && (
-                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-3" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
-                            <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase print-header-keep">{b.nombre}</div>
-                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 12}px` }}>
-                              <thead>
-                                <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
-                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-stone-200">
-                                {b.data.slice(1).map((f, fi) => (
-                                  <tr key={fi} style={{ backgroundColor: b.coloresFilas?.[fi + 1] || 'transparent' }}>
-                                    {f.map((cell, cii) => <td key={cii} className={`p-1.5 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            {!textoVacioQuill(b.pieBloque) && <div className="p-2.5 bg-stone-50 text-xs border-t border-stone-200" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
-                          </div>
-                        )}
-                        {b.tipo === 'grafica' && (
-                          <div className="border border-stone-200 rounded-2xl p-6 my-4 print-avoid-break" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
-                            <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
-                            {renderizarGrafica(b)}
-                            {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
-                          </div>
-                        )}
-                        {b.tipo === 'imagen' && b.url && (
-                          <div className="my-4 text-center print-avoid-break">
-                            <img src={b.url} alt="Imagen" className="max-h-80 mx-auto rounded-xl object-contain" />
-                          </div>
-                        )}
+                  <div className="relative z-10 flex flex-col flex-1">
+                    {cabeceraMostrarPdf && (
+                      <div className="mb-4 pb-2 border-b border-stone-200/60 prose prose-sm prose-stone max-w-none opacity-80 print-header-keep" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrarPdf) }} />
+                    )}
+                    {(tieneT || tieneSub) && (
+                      <div className="mb-6 border-b border-stone-200/60 pb-4 print-header-keep">
+                        <div className="flex items-center gap-4">
+                          {mostrarNum && <span className="text-4xl font-black opacity-30">{sec.numeroReal}.</span>}
+                          {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
+                        </div>
+                        {tieneSub && <p className="text-base text-stone-500 font-serif italic mt-2">{p.subtitulo}</p>}
                       </div>
-                    ))}
+                    )}
+                    <div className="space-y-6 flex-1">
+                      {p.bloques.map((b) => (
+                        <div key={b.id} className={`w-full ${b.tipo === 'grafica' || b.tipo === 'firma' || b.tipo === 'imagen' ? 'print-avoid-break' : ''}`}>
+                          {b.tipo === 'texto' && (
+                            b.columnas === 2 || b.columnas === 3 ? (
+                              <div 
+                                className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
+                                style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                              >
+                                <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                                <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
+                                {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200/70 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
+                              </div>
+                            ) : (
+                              <div 
+                                className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
+                                style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
+                              />
+                            )
+                          )}
+                          {b.tipo === 'firma' && (
+                            <div 
+                              className={`py-4 px-4 rounded-2xl flex flex-wrap gap-12 items-start ${
+                                b.alineacion === 'centro' ? 'justify-center text-center' :
+                                b.alineacion === 'derecha' ? 'justify-end text-right' :
+                                b.alineacion === 'espaciado' ? 'justify-around text-left' :
+                                'justify-start text-left'
+                              }`}
+                              style={{ 
+                                backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
+                                paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
+                                paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
+                              }}
+                            >
+                              {(b.firmas || []).map((f, i) => (
+                                <div 
+                                  key={i} 
+                                  className="flex flex-col space-y-1 min-w-52"
+                                  style={{ transform: `translateY(${f.espacioSuperior ?? 0}px)` }}
+                                >
+                                  {f.url && (
+                                    <div className={`mb-2 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                      <img 
+                                        src={f.url} 
+                                        alt={f.nombre} 
+                                        style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
+                                        className="object-contain" 
+                                      />
+                                    </div>
+                                  )}
+                                  <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
+                                  {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
+                                  {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {b.tipo === 'boton' && (() => {
+                            const szBtn = obtenerEstilosTamanoBoton(b.tamanoBoton);
+                            const famBtn = NOMBRES_FUENTES_WORD[b.fuenteBoton || 'arial']?.family || 'sans-serif';
+                            return (
+                              <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                <span
+                                  style={{
+                                    backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
+                                    color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
+                                    borderColor: b.colorBoton,
+                                    padding: szBtn.padding,
+                                    fontSize: szBtn.fontSize,
+                                    fontFamily: famBtn,
+                                    boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
+                                  }}
+                                  className={`font-black uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
+                                >
+                                  {b.texto}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                          {b.tipo === 'tabla' && !b.oculto && (
+                            <div className="border border-stone-300 rounded-2xl overflow-hidden my-3" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                              <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase print-header-keep">{b.nombre}</div>
+                              <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 12}px` }}>
+                                <thead>
+                                  <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
+                                    {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-200">
+                                  {b.data.slice(1).map((f, fi) => (
+                                    <tr key={fi} style={{ backgroundColor: b.coloresFilas?.[fi + 1] || 'transparent' }}>
+                                      {f.map((cell, cii) => <td key={cii} className={`p-1.5 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {!textoVacioQuill(b.pieBloque) && <div className="p-2.5 bg-stone-50 text-xs border-t border-stone-200" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
+                            </div>
+                          )}
+                          {b.tipo === 'grafica' && (
+                            <div className="border border-stone-200 rounded-2xl p-6 my-4 print-avoid-break" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                              <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
+                              {renderizarGrafica(b)}
+                              {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
+                            </div>
+                          )}
+                          {b.tipo === 'imagen' && b.url && (
+                            <div className="my-4 text-center print-avoid-break">
+                              <img src={b.url} alt="Imagen" className="max-h-80 mx-auto rounded-xl object-contain" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {pieMostrarPdf && (
+                      <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrarPdf) }} />
+                    )}
                   </div>
-                  {pieMostrarPdf && (
-                    <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrarPdf) }} />
-                  )}
                 </div>
               );
             })}
@@ -2028,7 +2121,22 @@ function LibroPublicoContent() {
 
               return (
                 <div className="h-full w-screen shrink-0 flex flex-col px-6 sm:px-12 md:px-24 lg:px-32 py-24 overflow-y-auto overflow-x-hidden custom-scrollbar relative z-10">
-                  <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col min-w-0">
+                  
+                  {/* IMAGEN DE FONDO INDIVIDUAL DE LA PÁGINA (IGUAL QUE EN LA PORTADA) */}
+                  {pagina.imagenFondo && (
+                    <div className="fixed inset-0 z-0 pointer-events-none">
+                      <img src={pagina.imagenFondo} alt="Fondo de página" className="w-full h-full object-cover" />
+                      <div 
+                        className="absolute inset-0 backdrop-blur-[1px]" 
+                        style={{ 
+                          backgroundColor: pagina.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+                          opacity: (pagina.opacidadFondo ?? 85) / 100
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col min-w-0 relative z-10">
                     
                     {cabeceraMostrar && (
                       <div 

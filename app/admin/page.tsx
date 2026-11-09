@@ -191,8 +191,42 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
     margin-right: 0;
     display: block;
   }
-  .ql-snow .ql-editor a {
+  /* Reglas exactas para respetar Negrita, Cursiva, Subrayado y Tachado en textos enlazados dentro y fuera de Quill */
+  .ql-snow .ql-editor a[data-custom-link="true"],
+  .prose a[data-custom-link="true"] {
     color: inherit;
+  }
+  .ql-snow .ql-editor a[data-bold="true"],
+  .prose a[data-bold="true"] {
+    font-weight: 700 !important;
+  }
+  .ql-snow .ql-editor a[data-bold="false"],
+  .prose a[data-bold="false"] {
+    font-weight: 400 !important;
+  }
+  .ql-snow .ql-editor a[data-italic="true"],
+  .prose a[data-italic="true"] {
+    font-style: italic !important;
+  }
+  .ql-snow .ql-editor a[data-italic="false"],
+  .prose a[data-italic="false"] {
+    font-style: normal !important;
+  }
+  .ql-snow .ql-editor a[data-underline="true"][data-strike="true"],
+  .prose a[data-underline="true"][data-strike="true"] {
+    text-decoration: underline line-through !important;
+  }
+  .ql-snow .ql-editor a[data-underline="true"]:not([data-strike="true"]),
+  .prose a[data-underline="true"]:not([data-strike="true"]) {
+    text-decoration: underline !important;
+  }
+  .ql-snow .ql-editor a[data-underline="false"][data-strike="true"],
+  .prose a[data-underline="false"][data-strike="true"] {
+    text-decoration: line-through !important;
+  }
+  .ql-snow .ql-editor a[data-underline="false"]:not([data-strike="true"]),
+  .prose a[data-underline="false"]:not([data-strike="true"]) {
+    text-decoration: none !important;
   }
   .prose p {
     margin-top: 0 !important;
@@ -200,7 +234,6 @@ const ESTILOS_FUENTES_QUILL = FUENTES_WORD.map(f => `
     min-height: 1.5em;
     line-height: 1.5 !important;
   }
-  /* Soporte completo de viñetas y numeraciones de Quill v2 */
   .prose ul {
     list-style-type: disc !important;
     padding-left: 1.75rem !important;
@@ -332,6 +365,58 @@ const ReactQuill = dynamic(
         }
         Quill.register(CustomImage, true);
       }
+      // Permitir que los enlaces conserven style, data-bold, data-underline, data-strike, data-italic y data-internal-page sin que Quill los borre
+      const BaseLink = Quill.import('formats/link') as any;
+      if (BaseLink) {
+        const LINK_ATTRIBUTES = [
+          'href', 'target', 'rel', 'style',
+          'data-custom-link', 'data-internal-page',
+          'data-bold', 'data-underline', 'data-strike', 'data-italic', 'data-color'
+        ];
+        class CustomLink extends BaseLink {
+          static create(value: any) {
+            const node = super.create(typeof value === 'string' ? value : (value?.href || '#')) as HTMLElement;
+            if (typeof value === 'object' && value !== null) {
+              LINK_ATTRIBUTES.forEach(attr => {
+                if (value[attr] !== undefined && value[attr] !== null) {
+                  node.setAttribute(attr, String(value[attr]));
+                }
+              });
+            }
+            return node;
+          }
+          static formats(domNode: HTMLElement) {
+            const href = domNode.getAttribute('href') || '#';
+            const tieneCustom = LINK_ATTRIBUTES.some(a => a !== 'href' && a !== 'target' && a !== 'rel' && domNode.hasAttribute(a));
+            if (!tieneCustom) return href;
+            const obj: Record<string, string> = { href };
+            LINK_ATTRIBUTES.forEach(attr => {
+              if (domNode.hasAttribute(attr)) {
+                obj[attr] = domNode.getAttribute(attr) || '';
+              }
+            });
+            return obj;
+          }
+          format(name: string, value: any) {
+            if (LINK_ATTRIBUTES.indexOf(name) > -1) {
+              if (value) {
+                this.domNode.setAttribute(name, String(value));
+              } else {
+                this.domNode.removeAttribute(name);
+              }
+            } else if (name === 'link' && typeof value === 'object' && value !== null) {
+              LINK_ATTRIBUTES.forEach(attr => {
+                if (value[attr] !== undefined && value[attr] !== null) {
+                  this.domNode.setAttribute(attr, String(value[attr]));
+                }
+              });
+            } else {
+              super.format(name, value);
+            }
+          }
+        }
+        Quill.register(CustomLink, true);
+      }
     }
     return mod;
   },
@@ -424,6 +509,10 @@ type BloqueGrafica = BloqueBase & {
   ocultarEjeX?: boolean;
   ocultarLeyenda?: boolean;
   alturaGrafica?: number;
+  grosorBarra?: number;
+  espacioEntreBarras?: number;
+  ejeYMin?: number | string;
+  ejeYMax?: number | string;
   pieBloque?: string;
 };
 
@@ -457,6 +546,8 @@ type Pagina = {
   piePaginaHtml?: string;
   bloques: Bloque[]; 
   colorFondo?: string; 
+  imagenFondo?: string;
+  opacidadFondo?: number;
 };
 
 type ConfiguracionEdicion = {
@@ -522,7 +613,6 @@ export default function AdminPage() {
   
   const [tooltipMapa, setTooltipMapa] = useState<{ nombre: string; valor: string; x: number; y: number } | null>(null);
 
-  // GeoJSON de Colombia precargado en memoria para que siempre se renderice instantáneamente en los PDF
   const [colombiaGeoJson, setColombiaGeoJson] = useState<any>(null);
 
   const [selectorColorActivo, setSelectorColorActivo] = useState<{
@@ -561,7 +651,6 @@ export default function AdminPage() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // PALETA POR DEFECTO: COLORES SECUNDARIOS
   const COLORES_GRAFICAS_DEFAULT = PALETAS_GRAFICAS.secundarios.colores;
 
   const quillModules = useMemo(() => ({
@@ -745,7 +834,6 @@ export default function AdminPage() {
     }, 1500);
   };
 
-  // FUNCIÓN PARA CAMBIAR EL COLOR DE FONDO DE TODAS LAS PÁGINAS EXCEPTO LA PORTADA
   const aplicarColorFondoATodasLasPaginas = (colorHex: string) => {
     const nuevasPaginas = paginas.map(p => ({ ...p, colorFondo: colorHex }));
     const nuevaConfig = { ...configuracion, colorFondoPaginasGlobal: colorHex };
@@ -846,6 +934,8 @@ export default function AdminPage() {
           cabeceraHtml: pag.cabeceraHtml || '',
           piePaginaHtml: pag.piePaginaHtml || '',
           colorFondo: pag.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+          imagenFondo: pag.imagenFondo || '',
+          opacidadFondo: pag.opacidadFondo !== undefined ? Number(pag.opacidadFondo) : 85,
           bloques: bloquesConNuevosIds
         };
       });
@@ -943,6 +1033,10 @@ export default function AdminPage() {
               ocultarEjeX: !!b.ocultarEjeX,
               ocultarLeyenda: !!b.ocultarLeyenda,
               alturaGrafica: Number(b.alturaGrafica) || 380,
+              grosorBarra: b.grosorBarra !== undefined ? Number(b.grosorBarra) : 0,
+              espacioEntreBarras: b.espacioEntreBarras !== undefined ? Number(b.espacioEntreBarras) : 20,
+              ejeYMin: b.ejeYMin !== undefined ? b.ejeYMin : '',
+              ejeYMax: b.ejeYMax !== undefined ? b.ejeYMax : '',
               colorFondo: b.colorFondo || '#ffffff',
               escala: Number(b.escala) || 100,
               pieBloque: b.pieBloque || ''
@@ -1085,6 +1179,39 @@ export default function AdminPage() {
       mostrarMensaje(`Error al subir: ${err.message}`, 'error');
     } finally {
       setSubiendoImagen(prev => ({ ...prev, [bloqueId]: false }));
+    }
+  };
+
+  // Subida de imagen de fondo exclusiva para la página activa (igual que en la portada)
+  const manejarSubidaImagenFondoPagina = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !edicionActiva || !paginas[indicePaginaActual]) return;
+
+    const keyLoader = `bg_pag_${paginas[indicePaginaActual].id}`;
+    setSubiendoImagen(prev => ({ ...prev, [keyLoader]: true }));
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${generarId()}.${fileExt}`;
+      const filePath = `edicion_${edicionActiva.anio}/fondos_pagina/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('imagenes').upload(filePath, file, { cacheControl: '3600', upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('imagenes').getPublicUrl(filePath);
+
+      const nuevasPaginas = [...paginas];
+      nuevasPaginas[indicePaginaActual].imagenFondo = data.publicUrl;
+      if (nuevasPaginas[indicePaginaActual].opacidadFondo === undefined) {
+        nuevasPaginas[indicePaginaActual].opacidadFondo = 85;
+      }
+      autoGuardar(nuevasPaginas);
+      mostrarMensaje('Imagen de fondo de página actualizada con éxito', 'exito');
+    } catch (err: any) {
+      mostrarMensaje(`Error al subir fondo de página: ${err.message}`, 'error');
+    } finally {
+      setSubiendoImagen(prev => ({ ...prev, [keyLoader]: false }));
+      e.target.value = '';
     }
   };
 
@@ -1446,7 +1573,9 @@ export default function AdminPage() {
       mostrarNumero: true,
       posicion: 'despues_portada',
       bloques: [], 
-      colorFondo: configuracion.colorFondoPaginasGlobal || '#fdfbf7' 
+      colorFondo: configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+      imagenFondo: '',
+      opacidadFondo: 85
     };
     const nuevasPaginas = [...paginas];
     nuevasPaginas.splice(indicePaginaActual + 1, 0, nuevaPagina);
@@ -1654,6 +1783,10 @@ export default function AdminPage() {
       ocultarEjeX: false,
       ocultarLeyenda: false,
       alturaGrafica: 380,
+      grosorBarra: 0,
+      espacioEntreBarras: 20,
+      ejeYMin: '',
+      ejeYMax: '',
       colorFondo: '#ffffff',
       escala: 100,
       pieBloque: ''
@@ -1841,7 +1974,6 @@ export default function AdminPage() {
     }
   };
 
-  // APLICAR UNA PALETA COMPLETA DE COLORES A UNA GRÁFICA EN 1 CLIC
   const aplicarPaletaAGrafica = (bloqueId: string, clavePaleta: string) => {
     const paleta = PALETAS_GRAFICAS[clavePaleta];
     if (!paleta) return;
@@ -2115,7 +2247,7 @@ export default function AdminPage() {
     if (selectCol) selectCol.value = String(columna);
   };
 
-  // ENLAZAR EL TEXTO SELECCIONADO (O ESCRITO) CON PERSONALIZACIÓN COMPLETA: COLOR, NEGRITA, CURSIVA, SUBRAYADO Y TACHADO
+  // ENLAZAR EL TEXTO SELECCIONADO (O ESCRITO) CON SOPORTE 100% FUNCIONAL DE ACTIVAR/DESACTIVAR NEGRITA, CURSIVA, SUBRAYADO Y TACHADO
   const enlazarTextoEnColumna = (
     bloqueId: string,
     columnaDestino: 1 | 2 | 3,
@@ -2150,6 +2282,8 @@ export default function AdminPage() {
 
     const estiloLink = `color: ${colorEnlace} !important; text-decoration: ${decoStyle} !important; font-weight: ${weightStyle} !important; font-style: ${italicStyle} !important; cursor: pointer;`;
 
+    const attrsDatos = `data-custom-link="true" data-bold="${conNegrita}" data-underline="${conSubrayado}" data-strike="${conTachado}" data-italic="${conCursiva}" data-color="${colorEnlace}"`;
+
     if (
       seleccionTextoActiva &&
       seleccionTextoActiva.bloqueId === bloqueId &&
@@ -2158,7 +2292,15 @@ export default function AdminPage() {
     ) {
       try {
         const range = rangoSeleccionRef.current;
-        const textoSombreado = range.toString() || seleccionTextoActiva.texto;
+        const textoSombreado = (textoManual.trim() || range.toString() || seleccionTextoActiva.texto).trim();
+
+        // Si el usuario seleccionó un texto que ya estaba dentro de un <a>, <strong> o <u>, desenvolvemos esos padres si desactivó el formato
+        let nodoAncestro: Node | null = range.commonAncestorContainer;
+        if (nodoAncestro.nodeType === Node.TEXT_NODE) {
+          nodoAncestro = nodoAncestro.parentElement;
+        }
+        const anchorExistente = (nodoAncestro as HTMLElement | null)?.closest?.('a');
+
         const aElem = document.createElement('a');
         aElem.setAttribute('href', hrefFinal);
         if (tipoDestino === 'pagina') {
@@ -2168,11 +2310,34 @@ export default function AdminPage() {
           aElem.setAttribute('rel', 'noreferrer');
         }
         aElem.setAttribute('data-custom-link', 'true');
+        aElem.setAttribute('data-bold', String(conNegrita));
+        aElem.setAttribute('data-underline', String(conSubrayado));
+        aElem.setAttribute('data-strike', String(conTachado));
+        aElem.setAttribute('data-italic', String(conCursiva));
+        aElem.setAttribute('data-color', colorEnlace);
         aElem.setAttribute('style', estiloLink);
-        aElem.textContent = textoManual.trim() || textoSombreado;
+        aElem.textContent = textoSombreado;
 
-        range.deleteContents();
-        range.insertNode(aElem);
+        if (anchorExistente && editorContenedorRef.current.contains(anchorExistente)) {
+          anchorExistente.replaceWith(aElem);
+        } else {
+          range.deleteContents();
+          range.insertNode(aElem);
+        }
+
+        // Si desactivó negrita y había un <strong> o <b> envolviendo únicamente este enlace, lo limpiamos
+        if (!conNegrita && aElem.parentElement && (aElem.parentElement.tagName === 'STRONG' || aElem.parentElement.tagName === 'B')) {
+          const parentStrong = aElem.parentElement;
+          if (parentStrong.childNodes.length === 1) {
+            parentStrong.replaceWith(aElem);
+          }
+        }
+        if (!conSubrayado && aElem.parentElement && aElem.parentElement.tagName === 'U') {
+          const parentU = aElem.parentElement;
+          if (parentU.childNodes.length === 1) {
+            parentU.replaceWith(aElem);
+          }
+        }
 
         const nuevoHtmlEditor = editorContenedorRef.current.innerHTML;
         (bloque as any)[campo] = nuevoHtmlEditor;
@@ -2180,7 +2345,7 @@ export default function AdminPage() {
 
         setSeleccionTextoActiva(null);
         rangoSeleccionRef.current = null;
-        mostrarMensaje(tipoDestino === 'pagina' ? 'Texto seleccionado enlazado a la página' : 'Texto seleccionado enlazado a la URL', 'exito');
+        mostrarMensaje(tipoDestino === 'pagina' ? 'Enlace aplicado con el formato elegido' : 'Enlace URL aplicado con el formato elegido', 'exito');
         return;
       } catch (err) {
         // Fallback al reemplazo HTML
@@ -2194,10 +2359,17 @@ export default function AdminPage() {
       ? `data-internal-page="${destinoValor}"`
       : `target="_blank" rel="noreferrer"`;
 
-    const tagEnlace = `<a href="${hrefFinal}" ${attrsExtra} data-custom-link="true" style="${estiloLink}">${textoUsar}</a>`;
+    const tagEnlace = `<a href="${hrefFinal}" ${attrsExtra} ${attrsDatos} style="${estiloLink}">${textoUsar}</a>`;
 
     if (textoUsar && htmlActual.includes(textoUsar)) {
-      (bloque as any)[campo] = htmlActual.replace(textoUsar, tagEnlace);
+      // Reemplaza tanto si ya estaba enlazado como si estaba en texto plano
+      const escapado = textoUsar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regexEnlacePrevio = new RegExp(`<a\\b[^>]*>\\s*${escapado}\\s*<\\/a>`, 'i');
+      if (regexEnlacePrevio.test(htmlActual)) {
+        (bloque as any)[campo] = htmlActual.replace(regexEnlacePrevio, tagEnlace);
+      } else {
+        (bloque as any)[campo] = htmlActual.replace(textoUsar, tagEnlace);
+      }
     } else {
       (bloque as any)[campo] = `${htmlActual}<p>${tagEnlace}</p>`;
     }
@@ -2439,7 +2611,7 @@ export default function AdminPage() {
     return { datos: datosFormateados, cabeceras, ejesYUsar, sufijoPorcentaje: detectaPorcentajeGlobal, columnasPorcentaje };
   };
 
-  // RENDERIZADOR REAL DE GRÁFICAS PARA LA VISTA PREVIA Y EXPORTACIÓN PDF DEL ADMIN
+  // RENDERIZADOR REAL DE GRÁFICAS CON CONTROL DE DOMINIO Y (INICIO/FIN) Y GROSOR DE BARRAS
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
@@ -2450,6 +2622,19 @@ export default function AdminPage() {
     const paletaActiva = obtenerPaletaActivaBloque(bloque);
     const altoContenedor = Number(bloque.alturaGrafica) || 380;
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
+
+    // Cálculo del dominio personalizado (Valor mínimo desde donde inicia la gráfica y valor máximo)
+    const minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && !isNaN(Number(bloque.ejeYMin))
+      ? Number(bloque.ejeYMin)
+      : 0;
+    const maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && !isNaN(Number(bloque.ejeYMax))
+      ? Number(bloque.ejeYMax)
+      : 'auto';
+    const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
+
+    // Grosor de barras personalizado y espacio entre categorías
+    const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
+    const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
 
     const formatearEtiqueta = (v: any, nombreSerie?: string) => {
       const num = Number(v);
@@ -2466,16 +2651,17 @@ export default function AdminPage() {
       case 'barras':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
                   dataKey={nombre} 
+                  barSize={barSizeProp}
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={[6, 6, 0, 0]} 
                   isAnimationActive={false}
@@ -2500,9 +2686,9 @@ export default function AdminPage() {
       case 'barras_horizontales':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart layout="vertical" data={datos} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
+            <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
@@ -2510,6 +2696,7 @@ export default function AdminPage() {
                 <Bar 
                   key={nombre} 
                   dataKey={nombre} 
+                  barSize={barSizeProp}
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={[0, 6, 6, 0]} 
                   isAnimationActive={false}
@@ -2535,7 +2722,7 @@ export default function AdminPage() {
       case 'barras_3d_apiladas':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadowStack-admin-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="3" dy="5" stdDeviation="3" floodColor="#000000" floodOpacity="0.22" />
@@ -2543,7 +2730,7 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -2551,6 +2738,7 @@ export default function AdminPage() {
                   key={nombre} 
                   dataKey={nombre} 
                   stackId="a" 
+                  barSize={barSizeProp}
                   fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} 
                   radius={i === nombresEjesY.length - 1 ? [8, 8, 0, 0] : [0, 0, 0, 0]} 
                   style={bloque.tipoGrafica === 'barras_3d_apiladas' ? { filter: `url(#shadowStack-admin-${bloque.id})`, cursor: 'pointer' } : { cursor: 'pointer' }}
@@ -2567,7 +2755,7 @@ export default function AdminPage() {
       case 'barras_4d':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <BarChart data={datos} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
+            <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 30, right: 30, left: 0, bottom: 5 }}>
               <defs>
                 <filter id={`shadow4d-admin-${bloque.id}`} x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="4" dy="6" stdDeviation="4" floodColor="#000000" floodOpacity="0.25" />
@@ -2575,7 +2763,7 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
@@ -2584,6 +2772,7 @@ export default function AdminPage() {
                   <Bar 
                     key={nombre} 
                     dataKey={nombre} 
+                    barSize={barSizeProp}
                     fill={baseColor} 
                     radius={[12, 12, 4, 4]} 
                     style={{ filter: `url(#shadow4d-admin-${bloque.id})`, cursor: 'pointer' }} 
@@ -2755,7 +2944,7 @@ export default function AdminPage() {
       case 'barras_radiales':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="95%" barSize={22} data={datos}>
+            <RadialBarChart cx="50%" cy="50%" innerRadius="20%" outerRadius="95%" barSize={barSizeProp || 22} data={datos}>
               <RadialBar 
                 background 
                 dataKey={nombreY} 
@@ -2816,7 +3005,7 @@ export default function AdminPage() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={[0, 'auto']} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={dominioNumerico} allowDataOverflow={true} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -2842,7 +3031,7 @@ export default function AdminPage() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -2871,7 +3060,7 @@ export default function AdminPage() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -2896,10 +3085,10 @@ export default function AdminPage() {
       case 'combinada':
         return (
           <ResponsiveContainer width="100%" height={altoContenedor}>
-            <ComposedChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
+            <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={[0, 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
@@ -2912,7 +3101,7 @@ export default function AdminPage() {
                   );
                 }
                 return (
-                  <Bar key={nombre} dataKey={nombre} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre)}>
+                  <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={color} radius={[6, 6, 0, 0]} isAnimationActive={false} onClick={() => abrirSelectorDirecto(i, nombre)}>
                     {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
                   </Bar>
                 );
@@ -2928,7 +3117,7 @@ export default function AdminPage() {
             <RadarChart cx="50%" cy="50%" outerRadius="78%" data={datos}>
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#cbd5e1" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
-              <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#94a3b8', fontSize: 10 }} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3029,7 +3218,7 @@ export default function AdminPage() {
     }
   };
 
-  // RENDERIZADOR INFALIBLE DE BOTONES INLINE CON SOPORTE DE TAMAÑO Y TIPO DE LETRA
+  // RENDERIZADOR INFALIBLE DE BOTONES Y ENLACES PERSONALIZADOS DENTRO DEL TEXTO
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
     const htmlSinNbsp = html.replace(/&nbsp;|&#160;|\u00A0/gi, ' ');
@@ -3037,7 +3226,33 @@ export default function AdminPage() {
       .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
       .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
 
-    return htmlConSaltosPreservados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
+    // Reconstruir los estilos inline de cualquier <a data-custom-link="true"> para garantizar que Negrita, Subrayado, Tachado y Cursiva se respeten siempre
+    const htmlConLinksForzados = htmlConSaltosPreservados.replace(/<a\b([^>]*data-custom-link="true"[^>]*)>/gi, (fullMatch, attrs) => {
+      const boldMatch = attrs.match(/data-bold="([^"]*)"/i);
+      const underMatch = attrs.match(/data-underline="([^"]*)"/i);
+      const strikeMatch = attrs.match(/data-strike="([^"]*)"/i);
+      const italicMatch = attrs.match(/data-italic="([^"]*)"/i);
+      const colorMatch = attrs.match(/data-color="([^"]*)"/i);
+
+      const esBold = boldMatch ? boldMatch[1] === 'true' : true;
+      const esUnder = underMatch ? underMatch[1] === 'true' : true;
+      const esStrike = strikeMatch ? strikeMatch[1] === 'true' : false;
+      const esItalic = italicMatch ? italicMatch[1] === 'true' : false;
+      const colorHex = colorMatch ? colorMatch[1] : '#1d4ed8';
+
+      const decos: string[] = [];
+      if (esUnder) decos.push('underline');
+      if (esStrike) decos.push('line-through');
+      const decoCss = decos.length > 0 ? decos.join(' ') : 'none';
+      const weightCss = esBold ? '700' : '400';
+      const italicCss = esItalic ? 'italic' : 'normal';
+
+      const styleForzado = `color: ${colorHex} !important; font-weight: ${weightCss} !important; font-style: ${italicCss} !important; text-decoration: ${decoCss} !important; cursor: pointer;`;
+      const attrsSinStyle = attrs.replace(/\s*style="[^"]*"/gi, '');
+      return `<a ${attrsSinStyle} style="${styleForzado}">`;
+    });
+
+    return htmlConLinksForzados.replace(/\[\[BOTON\|([\s\S]*?)\]\]/g, (_, contenidoInterno) => {
       const limpio = String(contenidoInterno)
         .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
@@ -3117,7 +3332,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MENÚ LATERAL COLAPSABLE (BIBLIOTECA DE EDICIONES) */}
+      {/* MENÚ LATERAL COLAPSABLE */}
       {menuLateralAbierto && !generandoPdfAdmin && (
         <aside className="w-80 bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0 shadow-sm transition-all duration-300 no-print">
           <div className="px-6 py-8 border-b border-slate-100 flex items-center justify-between">
@@ -3181,21 +3396,29 @@ export default function AdminPage() {
           <div className="max-w-5xl mx-auto">
             
             {/* Portada en PDF */}
-            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10 py-24" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
-              {configuracion.logoUrl && (
-                <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
+            <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10 py-24 relative" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
+              {configuracion.imagenFondoPortada && (
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                  <img src={configuracion.imagenFondoPortada} alt="Fondo Portada" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0" style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }} />
+                </div>
               )}
-              <div className="w-16 h-1 mb-10" style={{ backgroundColor: edicionActiva?.color_principal || '#1d4ed8' }}></div>
-              <div 
-                className="w-full prose prose-stone max-w-none [&_h1]:text-5xl [&_h1]:font-normal [&_h1]:mb-6 [&_p]:text-xl [&_p]:italic [&_p]:text-stone-600"
-                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido || contenidoPortadaPorDefecto) }}
-              />
-              <div className="mt-20 flex flex-col items-center">
-                <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400 mb-2">ACOFI / Edición Oficial {edicionActiva?.anio}</span>
+              <div className="relative z-10 flex flex-col items-center w-full">
+                {configuracion.logoUrl && (
+                  <img src={configuracion.logoUrl} alt="Logo" style={{ height: `${configuracion.logoSize ?? 56}px` }} className="w-auto object-contain mb-8" />
+                )}
+                <div className="w-16 h-1 mb-10" style={{ backgroundColor: edicionActiva?.color_principal || '#1d4ed8' }}></div>
+                <div 
+                  className="w-full prose prose-stone max-w-none [&_h1]:text-5xl [&_h1]:font-normal [&_h1]:mb-6 [&_p]:text-xl [&_p]:italic [&_p]:text-stone-600"
+                  dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(configuracion.portadaContenido || contenidoPortadaPorDefecto) }}
+                />
+                <div className="mt-20 flex flex-col items-center">
+                  <span className="text-xs font-sans font-bold tracking-[0.3em] uppercase text-stone-400 mb-2">ACOFI / Edición Oficial {edicionActiva?.anio}</span>
+                </div>
               </div>
             </div>
 
-            {/* Todas las Páginas del Libro en PDF (sin títulos huérfanos y con mapas completos) */}
+            {/* Todas las Páginas del Libro en PDF */}
             {paginas.map((p, pIdx) => {
               const tieneT = p.titulo.trim() !== '';
               const tieneSub = (p.subtitulo || '').trim() !== '';
@@ -3208,135 +3431,149 @@ export default function AdminPage() {
                 : (configuracion.mostrarPiePaginaGlobal && !textoVacioQuill(configuracion.piePaginaGlobalHtml) ? configuracion.piePaginaGlobalHtml : '');
 
               return (
-                <div key={p.id} className="print-page-sheet flex flex-col" style={{ backgroundColor: p.colorFondo || '#fdfbf7' }}>
-                  {cabeceraMostrar && (
-                    <div className="mb-4 pb-2 border-b border-stone-200 text-xs opacity-75 print-header-keep" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }} />
-                  )}
-                  {(tieneT || tieneSub) && (
-                    <div className="mb-6 border-b border-stone-200 pb-4 print-header-keep">
-                      <div className="flex items-center gap-4">
-                        {mostrarNum && <span className="text-4xl font-black opacity-30">{pIdx + 1}.</span>}
-                        {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
-                      </div>
-                      {tieneSub && <p className="text-base text-stone-500 font-serif italic mt-2">{p.subtitulo}</p>}
+                <div key={p.id} className="print-page-sheet flex flex-col relative" style={{ backgroundColor: p.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7' }}>
+                  {p.imagenFondo && (
+                    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                      <img src={p.imagenFondo} alt="Fondo Página" className="w-full h-full object-cover" />
+                      <div 
+                        className="absolute inset-0" 
+                        style={{ 
+                          backgroundColor: p.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+                          opacity: (p.opacidadFondo ?? 85) / 100
+                        }} 
+                      />
                     </div>
                   )}
-                  <div className="space-y-6 flex-1">
-                    {p.bloques.map((b) => (
-                      <div key={b.id} className={`w-full ${b.tipo === 'grafica' || b.tipo === 'firma' || b.tipo === 'imagen' ? 'print-avoid-break' : ''}`}>
-                        {b.tipo === 'texto' && (
-                          b.columnas === 2 || b.columnas === 3 ? (
-                            <div 
-                              className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
-                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
-                            >
-                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
-                              <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
-                              {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
-                            </div>
-                          ) : (
-                            <div 
-                              className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
-                              style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
-                              dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
-                            />
-                          )
-                        )}
-                        {b.tipo === 'firma' && (
-                          <div 
-                            className={`py-4 px-4 rounded-2xl flex flex-wrap gap-10 items-start ${
-                              b.alineacion === 'centro' ? 'justify-center text-center' :
-                              b.alineacion === 'derecha' ? 'justify-end text-right' :
-                              b.alineacion === 'espaciado' ? 'justify-around text-left' :
-                              'justify-start text-left'
-                            }`}
-                            style={{ 
-                              backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
-                              paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
-                              paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
-                            }}
-                          >
-                            {(b.firmas || []).map((f, i) => (
-                              <div 
-                                key={i} 
-                                className="flex flex-col space-y-1 min-w-52"
-                                style={{ transform: `translateY(${f.espacioSuperior ?? 0}px)` }}
-                              >
-                                {f.url && (
-                                  <img 
-                                    src={f.url} 
-                                    alt={f.nombre} 
-                                    style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
-                                    className={`object-contain mb-2 ${b.alineacion === 'centro' ? 'mx-auto' : b.alineacion === 'derecha' ? 'ml-auto' : 'mr-auto'}`} 
-                                  />
-                                )}
-                                <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
-                                {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
-                                {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {b.tipo === 'boton' && (() => {
-                          const szBtn = obtenerEstilosTamanoBoton(b.tamanoBoton);
-                          const famBtn = NOMBRES_FUENTES_WORD[b.fuenteBoton || 'arial']?.family || 'sans-serif';
-                          return (
-                            <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
-                              <span
-                                style={{
-                                  backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
-                                  color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
-                                  borderColor: b.colorBoton,
-                                  padding: szBtn.padding,
-                                  fontSize: szBtn.fontSize,
-                                  fontFamily: famBtn,
-                                  boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
-                                }}
-                                className={`font-black uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
-                              >
-                                {b.texto}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {b.tipo === 'tabla' && !b.oculto && (
-                          <div className="border border-stone-300 rounded-2xl overflow-hidden my-3" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
-                            <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase print-header-keep">{b.nombre}</div>
-                            <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 12}px` }}>
-                              <thead>
-                                <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
-                                  {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-stone-200">
-                                {b.data.slice(1).map((f, fi) => (
-                                  <tr key={fi} style={{ backgroundColor: b.coloresFilas?.[fi + 1] || 'transparent' }}>
-                                    {f.map((cell, cii) => <td key={cii} className={`p-1.5 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            {!textoVacioQuill(b.pieBloque) && <div className="p-2.5 bg-stone-50 text-xs border-t border-stone-200" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
-                          </div>
-                        )}
-                        {b.tipo === 'grafica' && (
-                          <div className="border border-stone-200 rounded-2xl p-6 my-4 print-avoid-break" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
-                            <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
-                            {renderizarGrafica(b)}
-                            {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
-                          </div>
-                        )}
-                        {b.tipo === 'imagen' && b.url && (
-                          <div className="my-4 text-center print-avoid-break">
-                            <img src={b.url} alt="Imagen" className="max-h-80 mx-auto rounded-xl object-contain" />
-                          </div>
-                        )}
+                  <div className="relative z-10 flex flex-col flex-1">
+                    {cabeceraMostrar && (
+                      <div className="mb-4 pb-2 border-b border-stone-200 text-xs opacity-75 print-header-keep" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(cabeceraMostrar) }} />
+                    )}
+                    {(tieneT || tieneSub) && (
+                      <div className="mb-6 border-b border-stone-200 pb-4 print-header-keep">
+                        <div className="flex items-center gap-4">
+                          {mostrarNum && <span className="text-4xl font-black opacity-30">{pIdx + 1}.</span>}
+                          {tieneT && <h2 className="text-3xl font-black tracking-tight">{p.titulo}</h2>}
+                        </div>
+                        {tieneSub && <p className="text-base text-stone-500 font-serif italic mt-2">{p.subtitulo}</p>}
                       </div>
-                    ))}
+                    )}
+                    <div className="space-y-6 flex-1">
+                      {p.bloques.map((b) => (
+                        <div key={b.id} className={`w-full ${b.tipo === 'grafica' || b.tipo === 'firma' || b.tipo === 'imagen' ? 'print-avoid-break' : ''}`}>
+                          {b.tipo === 'texto' && (
+                            b.columnas === 2 || b.columnas === 3 ? (
+                              <div 
+                                className={`grid ${b.columnas === 2 ? 'grid-cols-2 gap-8' : 'grid-cols-3 gap-6'} p-4 rounded-2xl items-start`}
+                                style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                              >
+                                <div className="prose prose-stone max-w-none text-stone-700 leading-normal" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} />
+                                <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol2 || '') }} />
+                                {b.columnas === 3 && <div className="prose prose-stone max-w-none text-stone-700 leading-normal border-l border-stone-200 pl-6" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenidoCol3 || '') }} />}
+                              </div>
+                            ) : (
+                              <div 
+                                className="prose prose-stone max-w-none text-stone-700 leading-relaxed p-4 rounded-2xl"
+                                style={{ backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent') }}
+                                dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.contenido) }} 
+                              />
+                            )
+                          )}
+                          {b.tipo === 'firma' && (
+                            <div 
+                              className={`py-4 px-4 rounded-2xl flex flex-wrap gap-10 items-start ${
+                                b.alineacion === 'centro' ? 'justify-center text-center' :
+                                b.alineacion === 'derecha' ? 'justify-end text-right' :
+                                b.alineacion === 'espaciado' ? 'justify-around text-left' :
+                                'justify-start text-left'
+                              }`}
+                              style={{ 
+                                backgroundColor: b.colorFondo === 'transparent' ? 'transparent' : (b.colorFondo || 'transparent'),
+                                paddingTop: `${Math.max(8, 20 + (b.espacioGeneralSuperior ?? 0))}px`,
+                                paddingBottom: `${Math.max(8, 20 + (b.espacioGeneralInferior ?? 0))}px`
+                              }}
+                            >
+                              {(b.firmas || []).map((f, i) => (
+                                <div 
+                                  key={i} 
+                                  className="flex flex-col space-y-1 min-w-52"
+                                  style={{ transform: `translateY(${f.espacioSuperior ?? 0}px)` }}
+                                >
+                                  {f.url && (
+                                    <img 
+                                      src={f.url} 
+                                      alt={f.nombre} 
+                                      style={{ height: `${f.tamanoFirma ?? 72}px`, maxHeight: `${f.tamanoFirma ?? 72}px`, width: 'auto' }} 
+                                      className={`object-contain mb-2 ${b.alineacion === 'centro' ? 'mx-auto' : b.alineacion === 'derecha' ? 'ml-auto' : 'mr-auto'}`} 
+                                    />
+                                  )}
+                                  <span className="font-sans font-black text-stone-900 text-base leading-snug">{f.nombre}</span>
+                                  {f.cargo && <span className="font-sans text-stone-600 text-sm leading-snug">{f.cargo}</span>}
+                                  {f.infoAdicional && <span className="font-sans text-stone-500 text-xs italic leading-snug">{f.infoAdicional}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {b.tipo === 'boton' && (() => {
+                            const szBtn = obtenerEstilosTamanoBoton(b.tamanoBoton);
+                            const famBtn = NOMBRES_FUENTES_WORD[b.fuenteBoton || 'arial']?.family || 'sans-serif';
+                            return (
+                              <div className={`py-3 flex ${b.alineacion === 'centro' ? 'justify-center' : b.alineacion === 'derecha' ? 'justify-end' : 'justify-start'}`}>
+                                <span
+                                  style={{
+                                    backgroundColor: b.estilo === 'contorno' ? 'transparent' : b.colorBoton,
+                                    color: b.estilo === 'contorno' ? b.colorBoton : b.colorTexto,
+                                    borderColor: b.colorBoton,
+                                    padding: szBtn.padding,
+                                    fontSize: szBtn.fontSize,
+                                    fontFamily: famBtn,
+                                    boxShadow: b.estilo === '4d' ? `0 0 20px 3px ${b.colorIluminacion || b.colorBoton}` : undefined
+                                  }}
+                                  className={`font-black uppercase tracking-wider inline-block ${b.estilo === 'pildora' || b.estilo === '4d' ? 'rounded-full' : 'rounded-xl'}`}
+                                >
+                                  {b.texto}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                          {b.tipo === 'tabla' && !b.oculto && (
+                            <div className="border border-stone-300 rounded-2xl overflow-hidden my-3" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                              <div className="bg-stone-100 p-3 font-sans font-bold text-xs uppercase print-header-keep">{b.nombre}</div>
+                              <table className="w-full text-left font-sans border-collapse" style={{ fontSize: `${b.tamanoTextoTabla ?? 12}px` }}>
+                                <thead>
+                                  <tr className="bg-stone-200/70 border-b border-stone-300" style={{ backgroundColor: b.coloresFilas?.[0] || '#f5f5f4' }}>
+                                    {b.data[0]?.map((c, ci) => <th key={ci} className="p-2 font-bold uppercase">{c}</th>)}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-200">
+                                  {b.data.slice(1).map((f, fi) => (
+                                    <tr key={fi} style={{ backgroundColor: b.coloresFilas?.[fi + 1] || 'transparent' }}>
+                                      {f.map((cell, cii) => <td key={cii} className={`p-1.5 ${cii === 0 ? 'font-semibold' : ''}`}>{cell}</td>)}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {!textoVacioQuill(b.pieBloque) && <div className="p-2.5 bg-stone-50 text-xs border-t border-stone-200" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
+                            </div>
+                          )}
+                          {b.tipo === 'grafica' && (
+                            <div className="border border-stone-200 rounded-2xl p-6 my-4 print-avoid-break" style={{ backgroundColor: b.colorFondo || '#ffffff' }}>
+                              <h3 className="font-sans font-bold uppercase tracking-widest text-xs text-center mb-4">{b.nombre}</h3>
+                              {renderizarGrafica(b)}
+                              {!textoVacioQuill(b.pieBloque) && <div className="mt-3 pt-2 border-t border-stone-200 text-xs" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(b.pieBloque || '') }} />}
+                            </div>
+                          )}
+                          {b.tipo === 'imagen' && b.url && (
+                            <div className="my-4 text-center print-avoid-break">
+                              <img src={b.url} alt="Imagen" className="max-h-80 mx-auto rounded-xl object-contain" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {pieMostrar && (
+                      <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrar) }} />
+                    )}
                   </div>
-                  {pieMostrar && (
-                    <div className="mt-8 pt-3 border-t border-stone-200 text-xs opacity-75" dangerouslySetInnerHTML={{ __html: renderizarBotonesEnTexto(pieMostrar) }} />
-                  )}
                 </div>
               );
             })}
@@ -3518,7 +3755,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* OPCIÓN PARA CAMBIAR EL COLOR DE TODAS LAS PÁGINAS DEL LIBRO EXCEPTO LA PORTADA */}
                         <div>
                           <label className="block text-sm font-bold text-blue-700 mb-2 uppercase tracking-wide">Fondo Todas las Páginas</label>
                           <div className="flex flex-col gap-2">
@@ -3789,7 +4025,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* CABECERA CONFIGURABLE DE LA PÁGINA */}
+                  {/* CABECERA CONFIGURABLE DE LA PÁGINA (CON SELECTOR DE COLOR E IMAGEN DE FONDO INDIVIDUAL) */}
                   <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                       <div className="w-full space-y-4">
@@ -3818,16 +4054,89 @@ export default function AdminPage() {
                       <div className="shrink-0 flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <input 
                           type="color" 
-                          value={paginaActiva.colorFondo || '#fdfbf7'} 
+                          value={paginaActiva.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7'} 
                           onChange={(e) => actualizarColorFondoPagina(e.target.value)} 
                           className="w-10 h-10 cursor-pointer rounded-lg border-2"
                           title="Color de fondo de la página"
                         />
                         <div>
                           <span className="block text-sm font-bold text-slate-800">Fondo de Página</span>
-                          <span className="block text-xs text-slate-500">{paginaActiva.colorFondo || '#fdfbf7'}</span>
+                          <span className="block text-xs text-slate-500">{paginaActiva.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7'}</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* CONFIGURACIÓN DE IMAGEN DE FONDO DE PÁGINA (IGUAL QUE EN LA PORTADA) */}
+                    <div className="pt-4 border-t border-slate-100 bg-slate-50/70 p-4 rounded-xl border space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-600 flex items-center gap-2">
+                          <ImagePlus size={15} className="text-blue-600" /> Imagen de Fondo Exclusiva para esta Página (Igual que en Portada)
+                        </span>
+                        {paginaActiva.imagenFondo && (
+                          <button
+                            type="button"
+                            onClick={() => actualizarCampoPagina('imagenFondo', '')}
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={12} /> Quitar imagen de fondo
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={manejarSubidaImagenFondoPagina}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            disabled={subiendoImagen[`bg_pag_${paginaActiva.id}`]}
+                          />
+                          <button type="button" className="w-full px-4 py-2.5 bg-white border border-slate-300 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 shadow-xs">
+                            {subiendoImagen[`bg_pag_${paginaActiva.id}`] ? <RefreshCcw size={14} className="animate-spin" /> : <Upload size={14} />}
+                            {subiendoImagen[`bg_pag_${paginaActiva.id}`] ? 'Subiendo imagen de fondo...' : 'Subir Imagen de Fondo para esta Hoja'}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={paginaActiva.imagenFondo || ''}
+                          onChange={(e) => actualizarCampoPagina('imagenFondo', e.target.value)}
+                          placeholder="O pegar URL de la imagen de fondo..."
+                          className="flex-1 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {paginaActiva.imagenFondo && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
+                          <div className="md:col-span-2 bg-white p-3 rounded-xl border border-slate-200">
+                            <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-1">
+                              <span>Opacidad del Velo de Color sobre la Imagen (Legibilidad del texto)</span>
+                              <span className="text-blue-600 font-black">{paginaActiva.opacidadFondo ?? 85}%</span>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="96"
+                              step="2"
+                              value={paginaActiva.opacidadFondo ?? 85}
+                              onChange={(e) => actualizarCampoPagina('opacidadFondo', Number(e.target.value))}
+                              className="w-full accent-blue-600 cursor-pointer"
+                            />
+                            <span className="block text-[10px] text-slate-400 mt-1">0% = Imagen 100% nítida sin velo • 85% = Marca suave editorial detrás del texto</span>
+                          </div>
+                          <div className="h-20 rounded-xl overflow-hidden border border-slate-200 relative flex items-center justify-center bg-white">
+                            <img src={paginaActiva.imagenFondo} alt="Previa Fondo" className="w-full h-full object-cover" />
+                            <div 
+                              className="absolute inset-0" 
+                              style={{ 
+                                backgroundColor: paginaActiva.colorFondo || configuracion.colorFondoPaginasGlobal || '#fdfbf7',
+                                opacity: (paginaActiva.opacidadFondo ?? 85) / 100
+                              }} 
+                            />
+                            <span className="relative z-10 text-[10px] font-black uppercase tracking-wider text-slate-800 bg-white/80 px-2 py-0.5 rounded">Vista Previa Fondo</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-6 items-center">
@@ -4247,7 +4556,7 @@ export default function AdminPage() {
                                     </button>
                                   </div>
 
-                                  {/* 2. INSERTAR Y GESTIONAR IMÁGENES EN EL TEXTO (EN POSICIÓN DEL CURSOR, BORDES, ALINEACIÓN, MOVER Y BORRAR) */}
+                                  {/* 2. INSERTAR Y GESTIONAR IMÁGENES EN EL TEXTO */}
                                   <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-3">
                                     <div className="flex flex-wrap items-center gap-2.5">
                                       <span className="text-[11px] font-black text-pink-600 uppercase tracking-wider flex items-center gap-1.5">
@@ -4578,7 +4887,6 @@ export default function AdminPage() {
                                         />
                                       </div>
 
-                                      {/* SLIDER DE TAMAÑO Y SLIDER DE MOVIMIENTO VERTICAL INDIVIDUAL (SOLO MUEVE ESTA FIRMA) */}
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-3.5 rounded-xl border border-slate-200">
                                         <div>
                                           <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
@@ -4641,7 +4949,6 @@ export default function AdminPage() {
                                 })}
                               </div>
 
-                              {/* VISTA PREVIA FIEL DE LAS FIRMAS CON MOVIMIENTO INDIVIDUAL SIN AFECTAR A LAS DEMÁS */}
                               <div 
                                 className={`p-6 bg-white rounded-2xl border border-dashed border-slate-300 flex flex-wrap gap-12 items-start ${
                                   bloque.alineacion === 'centro' ? 'justify-center text-center' :
@@ -5167,7 +5474,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* CONFIGURADOR DE GRÁFICAS (CON SELECTOR DE PALETAS, ALTURA VERTICAL, OCULTAR EJE X, OCULTAR LEYENDA Y DIAGNÓSTICO GEOESPACIAL) */}
+                          {/* CONFIGURADOR DE GRÁFICAS (CON SELECTOR DE PALETAS, ALTURA VERTICAL, GROSOR DE BARRAS, VALOR MÍNIMO/MÁXIMO EJE Y Y DIAGNÓSTICO GEOESPACIAL) */}
                           {bloque.tipo === 'grafica' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <input 
@@ -5328,6 +5635,73 @@ export default function AdminPage() {
                                           />
                                           Desactivar / Ocultar leyenda inferior
                                         </label>
+                                      </div>
+
+                                      {/* CONTROLES AVANZADOS: VALOR INICIAL/FINAL DEL EJE Y, Y GROSOR / ANCHO DE BARRAS */}
+                                      <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                                        <div>
+                                          <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">
+                                            Valor Mínimo Eje (Inicia en)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            placeholder="0 (Ej: 20)"
+                                            value={bloque.ejeYMin !== undefined ? bloque.ejeYMin : ''}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'ejeYMin', e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500"
+                                            title="Define desde qué número empieza el eje vertical (Ej: escribe 20 para que la gráfica inicie en 20% en lugar de 0%)"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">
+                                            Valor Máximo Eje (Termina en)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            placeholder="Automático (Ej: 30)"
+                                            value={bloque.ejeYMax !== undefined ? bloque.ejeYMax : ''}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'ejeYMax', e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500"
+                                            title="Déjalo vacío para cálculo automático o escribe el tope máximo del eje"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <label className="flex justify-between text-[11px] font-bold text-emerald-700 uppercase mb-1">
+                                            <span>Grosor / Ancho Barras</span>
+                                            <span className="font-black">{bloque.grosorBarra ? `${bloque.grosorBarra}px` : 'Auto'}</span>
+                                          </label>
+                                          <input
+                                            type="range"
+                                            min="0"
+                                            max="65"
+                                            step="1"
+                                            value={bloque.grosorBarra || 0}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'grosorBarra', Number(e.target.value))}
+                                            className="w-full accent-emerald-600 cursor-pointer mt-2"
+                                            title="0 = Automático. Súbelo para hacer las barras más anchas y gruesas"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <label className="flex justify-between text-[11px] font-bold text-slate-600 uppercase mb-1">
+                                            <span>Espacio entre Grupos</span>
+                                            <span className="font-black">{bloque.espacioEntreBarras ?? 20}%</span>
+                                          </label>
+                                          <input
+                                            type="range"
+                                            min="0"
+                                            max="45"
+                                            step="2"
+                                            value={bloque.espacioEntreBarras ?? 20}
+                                            onChange={(e) => actualizarGrafica(bloque.id, 'espacioEntreBarras', Number(e.target.value))}
+                                            className="w-full accent-slate-600 cursor-pointer mt-2"
+                                            title="Reduce este porcentaje (ej. a 4% o 6%) cuando tengas muchas barras para que tengan más espacio y se vean más anchas"
+                                          />
+                                        </div>
                                       </div>
 
                                       {/* SLIDER PARA CAMBIAR LA ALTURA INTERNA DE LA GRÁFICA */}
@@ -5510,7 +5884,6 @@ export default function AdminPage() {
                                 </div>
                               )}
 
-                              {/* PIE / NOTA / FUENTE PEGADO JUSTO DEBAJO DE LA GRÁFICA */}
                               <details className="mt-5 pt-4 border-t border-slate-100 group" open={!!bloque.pieBloque}>
                                 <summary className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-blue-600 cursor-pointer select-none flex items-center gap-2">
                                   <Type size={14} className="text-blue-600" />
