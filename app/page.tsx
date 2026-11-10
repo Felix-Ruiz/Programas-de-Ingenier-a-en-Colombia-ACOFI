@@ -136,13 +136,11 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
     word-break: normal !important;
     white-space: normal !important;
   }
-  /* Enlaces estándar (cuando no fueron configurados con el panel personalizado) */
   .prose a:not([data-inline-btn="true"]):not([data-custom-link="true"]) {
     color: #1d4ed8;
     font-weight: 700;
     transition: opacity 0.2s ease;
   }
-  /* Enlaces personalizados: respetan exactamente si el usuario activó o desactivó Negrita, Cursiva, Subrayado y Tachado */
   .prose a[data-custom-link="true"] {
     transition: opacity 0.2s ease;
   }
@@ -173,7 +171,6 @@ const ESTILOS_FUENTES_PUBLICO = Object.keys(NOMBRES_FUENTES_WORD).map(f => `
   .prose a:hover {
     opacity: 0.8;
   }
-  /* Soporte completo de viñetas (•), numeraciones (1. 2. 3.) y sangrías de Quill v2 en la vista pública */
   .prose ul {
     list-style-type: disc !important;
     list-style-position: outside !important;
@@ -1004,7 +1001,7 @@ function LibroPublicoContent() {
 
   const parseValor = (val: any) => {
     if (val === undefined || val === null) return 0;
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'number') return isFinite(val) ? val : 0;
     let s = String(val).trim();
     if (!s) return 0;
     s = s.replace(/[^0-9.,-]/g, '');
@@ -1032,7 +1029,7 @@ function LibroPublicoContent() {
       }
     }
     const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
+    return isFinite(n) ? n : 0;
   };
 
   const obtenerPaletaActivaBloque = (bloqueGrafica: BloqueGrafica) => {
@@ -1042,28 +1039,75 @@ function LibroPublicoContent() {
     return COLORES_GRAFICAS_DEFAULT;
   };
 
+  // FORMATEADOR 100% BLINDADO PARA RECHARTS (ESCAPA PUNTOS "." EN CABECERAS DE EXCEL Y EVITA ÍNDICES FUERA DE RANGO)
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = mapaTablasPorId[bloqueGrafica.tablaRef];
-    if (!tablaFuente || !tablaFuente.data || tablaFuente.data.length < 2) return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    if (!tablaFuente || !Array.isArray(tablaFuente.data) || tablaFuente.data.length < 2) {
+      return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
 
-    const cabecerasOriginales = tablaFuente.data[0] || [];
-    const cabeceras = cabecerasOriginales.map((c, i) => String(c || '').trim() || `Columna_${i + 1}`);
-    const filas = tablaFuente.data.slice(1);
+    const cabecerasOriginales = Array.isArray(tablaFuente.data[0]) ? tablaFuente.data[0] : [];
+    const totalColumnas = cabecerasOriginales.length;
+    if (totalColumnas === 0) {
+      return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
 
-    const ejeXSeguro = Number(bloqueGrafica.ejeX) || 0;
-    const ejesYUsar = (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY) && bloqueGrafica.ejesY.length > 0) 
-        ? bloqueGrafica.ejesY.map(Number) 
-        : cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
+    const conteoNombres: Record<string, number> = {};
+    const cabeceras = cabecerasOriginales.map((c, i) => {
+      let limpio = String(c ?? '')
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\./g, '․')
+        .replace(/[\[\]]/g, '')
+        .trim();
+      if (!limpio) limpio = `Columna ${i + 1}`;
+      if (conteoNombres[limpio] !== undefined) {
+        conteoNombres[limpio] += 1;
+        limpio = `${limpio} (${conteoNombres[limpio]})`;
+      } else {
+        conteoNombres[limpio] = 1;
+      }
+      return limpio;
+    });
 
-    const indiceMapa = ejesYUsar.length > 0 ? ejesYUsar[0] : 1;
+    const filas = tablaFuente.data
+      .slice(1)
+      .filter(f => Array.isArray(f) && f.some(celda => String(celda ?? '').trim() !== ''));
+
+    if (filas.length === 0) {
+      return { datos: [], cabeceras, ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
+    }
+
+    const rawEjeX = Number(bloqueGrafica.ejeX);
+    const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
+
+    let ejesYValidos: number[] = [];
+    if (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY)) {
+      ejesYValidos = Array.from(
+        new Set(
+          bloqueGrafica.ejesY
+            .map(Number)
+            .filter(idx => !isNaN(idx) && idx >= 0 && idx < totalColumnas && idx !== ejeXSeguro)
+        )
+      );
+    }
+
+    if (ejesYValidos.length === 0) {
+      ejesYValidos = cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
+    }
+    if (ejesYValidos.length === 0) {
+      ejesYValidos = [0];
+    }
+
+    const indiceMapa = ejesYValidos[0] ?? 0;
 
     let detectaPorcentaje = false;
     const columnasPorcentaje: Record<string, boolean> = {};
 
-    ejesYUsar.forEach(idx => {
+    ejesYValidos.forEach(idx => {
       const nombreCab = cabeceras[idx];
+      if (!nombreCab) return;
       const cabTienePorcentaje = nombreCab.includes('%') || nombreCab.toLowerCase().includes('porcentaje');
-      const filaTienePorcentaje = filas.some(f => String(f[idx] || '').includes('%'));
+      const filaTienePorcentaje = filas.some(f => String(f?.[idx] ?? '').includes('%'));
       if (cabTienePorcentaje || filaTienePorcentaje) {
         columnasPorcentaje[nombreCab] = true;
         detectaPorcentaje = true;
@@ -1073,24 +1117,25 @@ function LibroPublicoContent() {
     const paletaBase = obtenerPaletaActivaBloque(bloqueGrafica);
 
     const datosFormateados = filas.map((fila, fIdx) => {
-      const celdaPrincipal = String(fila[indiceMapa] || '');
+      const celdaPrincipal = String(fila?.[indiceMapa] ?? '');
       if (celdaPrincipal.includes('%')) detectaPorcentaje = true;
 
       const obj: any = { 
-          name: String(fila[ejeXSeguro] || `Ítem ${fIdx + 1}`).trim(),
-          valorMapa: parseValor(fila[indiceMapa]),
-          fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
+        name: String(fila?.[ejeXSeguro] ?? `Ítem ${fIdx + 1}`).trim() || `Ítem ${fIdx + 1}`,
+        valorMapa: parseValor(fila?.[indiceMapa]),
+        fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
       };
       
-      ejesYUsar.forEach(idx => {
+      ejesYValidos.forEach(idx => {
         const nombreCabecera = cabeceras[idx];
-        if (String(fila[idx] || '').includes('%')) detectaPorcentaje = true;
-        obj[nombreCabecera] = parseValor(fila[idx]);
+        if (nombreCabecera) {
+          obj[nombreCabecera] = parseValor(fila?.[idx]);
+        }
       });
       return obj;
     });
 
-    return { datos: datosFormateados, cabeceras, ejesYUsar, sufijoPorcentaje: detectaPorcentaje, columnasPorcentaje };
+    return { datos: datosFormateados, cabeceras, ejesYUsar: ejesYValidos, sufijoPorcentaje: detectaPorcentaje, columnasPorcentaje };
   };
 
   const normalizarTexto = (texto: any) => {
@@ -1106,23 +1151,40 @@ function LibroPublicoContent() {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
 
-    const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]);
+    const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]).filter(Boolean);
+    if (nombresEjesY.length === 0) return <div className="p-8 text-center text-stone-400 italic">Selecciona al menos una columna numérica para graficar.</div>;
+
     const nombreY = nombresEjesY[0];
     const unicaSerie = nombresEjesY.length === 1;
     const paletaActiva = obtenerPaletaActivaBloque(bloque);
-    const altoContenedor = Number(bloque.alturaGrafica) || 380;
+    const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
-    // Cálculo del dominio personalizado (Valor mínimo desde donde inicia la gráfica y valor máximo)
-    const minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && !isNaN(Number(bloque.ejeYMin))
+    // Cálculo seguro del dominio numérico (evita bloqueos si min >= max de los nuevos datos pegados)
+    let maxDatoReal = 0;
+    datos.forEach((d: any) => {
+      nombresEjesY.forEach(n => {
+        const v = Number(d[n]) || 0;
+        if (v > maxDatoReal) maxDatoReal = v;
+      });
+    });
+
+    let minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && isFinite(Number(bloque.ejeYMin))
       ? Number(bloque.ejeYMin)
       : 0;
-    const maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && !isNaN(Number(bloque.ejeYMax))
+    let maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && isFinite(Number(bloque.ejeYMax))
       ? Number(bloque.ejeYMax)
       : 'auto';
+
+    if (typeof maxValConfig === 'number' && minValConfig >= maxValConfig) {
+      minValConfig = 0;
+      maxValConfig = 'auto';
+    } else if (maxValConfig === 'auto' && maxDatoReal > 0 && minValConfig >= maxDatoReal) {
+      minValConfig = 0;
+    }
+
     const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
 
-    // Grosor de barras personalizado y espacio entre categorías
     const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
     const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
 
@@ -1140,9 +1202,9 @@ function LibroPublicoContent() {
             <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
@@ -1160,10 +1222,10 @@ function LibroPublicoContent() {
           <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[0, 6, 6, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
@@ -1188,9 +1250,9 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -1220,9 +1282,9 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
                 const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 return (
@@ -1340,7 +1402,6 @@ function LibroPublicoContent() {
                     <feDropShadow dx="0" dy="14" stdDeviation="8" floodColor="#0f172a" floodOpacity="0.35" />
                   </filter>
                 </defs>
-                {/* Capa de profundidad 3D con legendType="none" y tooltipType="none" para evitar nombres repetidos */}
                 <Pie
                   data={datos}
                   cx="50%"
@@ -1441,9 +1502,9 @@ function LibroPublicoContent() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={nombreY} domain={dominioNumerico} allowDataOverflow={true} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter key={nombre} name={nombre} data={datos} isAnimationActive={false} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1460,9 +1521,9 @@ function LibroPublicoContent() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line type={bloque.tipoGrafica === 'lineas_curvas' ? 'natural' : 'linear'} key={nombre} dataKey={nombre} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} strokeWidth={3.5} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1479,9 +1540,9 @@ function LibroPublicoContent() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area type="monotone" key={nombre} dataKey={nombre} stackId={bloque.tipoGrafica === 'area_apilada' ? '1' : undefined} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fillOpacity={0.65} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1497,9 +1558,9 @@ function LibroPublicoContent() {
             <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={true} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => {
                 const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 if (i === nombresEjesY.length - 1 && nombresEjesY.length > 1) {
@@ -1527,8 +1588,8 @@ function LibroPublicoContent() {
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#e7e5e4" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#78716c', fontSize: 12 }} />}
               <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#a8a29e', fontSize: 10 }} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), name]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar key={nombre} name={nombre} dataKey={nombre} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} strokeWidth={2.5} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fillOpacity={bloque.tipoGrafica === 'radar_relleno' ? 0.75 : 0.5} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 10, fontWeight: 'bold' }} />}
@@ -1560,7 +1621,7 @@ function LibroPublicoContent() {
                 style={{ left: tooltipMapa.x, top: tooltipMapa.y }}
               >
                 <span className="block text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-0.5">{tooltipMapa.nombre}</span>
-                <span className="block text-sm font-black text-amber-300">{nombreY || 'Total'}: {tooltipMapa.valor}</span>
+                <span className="block text-sm font-black text-amber-300">{(nombreY || 'Total').replace(/․/g, '.')}: {tooltipMapa.valor}</span>
               </div>
             )}
 
@@ -1621,7 +1682,6 @@ function LibroPublicoContent() {
     }
   };
 
-  // RENDERIZADOR INFALIBLE: RECONSTRUYE LOS ESTILOS DE ENLACES PERSONALIZADOS (NEGRITA, CURSIVA, SUBRAYADO, TACHADO) Y BOTONES INLINE
   const renderizarBotonesEnTexto = (html: string) => {
     if (!html) return '';
 
@@ -1630,7 +1690,6 @@ function LibroPublicoContent() {
       .replace(/<p(\s+[^>]*)?>\s*<br\s*\/?>\s*<\/p>/gi, '<p$1>&nbsp;</p>')
       .replace(/<p(\s+[^>]*)?>\s*<\/p>/gi, '<p$1>&nbsp;</p>');
 
-    // Reconstruir los estilos inline de cualquier <a data-custom-link="true"> para respetar siempre si Negrita o Subrayado están desactivados
     const htmlConLinksForzados = htmlConSaltosPreservados.replace(/<a\b([^>]*data-custom-link="true"[^>]*)>/gi, (_, attrs) => {
       const boldMatch = attrs.match(/data-bold="([^"]*)"/i);
       const underMatch = attrs.match(/data-underline="([^"]*)"/i);
@@ -1750,7 +1809,7 @@ function LibroPublicoContent() {
     >
       <style dangerouslySetInnerHTML={{ __html: ESTILOS_FUENTES_PUBLICO }} />
 
-      {/* MODO DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF (CON SOPORTE DE IMAGEN DE FONDO EN PORTADA Y EN CADA PÁGINA) */}
+      {/* MODO DE EXPORTACIÓN E IMPRESIÓN DEL LIBRO COMPLETO EN PDF */}
       {generandoPdfPublico && (
         <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
           <div className="max-w-5xl mx-auto">
@@ -2122,7 +2181,7 @@ function LibroPublicoContent() {
               return (
                 <div className="h-full w-screen shrink-0 flex flex-col px-6 sm:px-12 md:px-24 lg:px-32 py-24 overflow-y-auto overflow-x-hidden custom-scrollbar relative z-10">
                   
-                  {/* IMAGEN DE FONDO INDIVIDUAL DE LA PÁGINA (IGUAL QUE EN LA PORTADA) */}
+                  {/* IMAGEN DE FONDO INDIVIDUAL DE LA PÁGINA */}
                   {pagina.imagenFondo && (
                     <div className="fixed inset-0 z-0 pointer-events-none">
                       <img src={pagina.imagenFondo} alt="Fondo de página" className="w-full h-full object-cover" />
