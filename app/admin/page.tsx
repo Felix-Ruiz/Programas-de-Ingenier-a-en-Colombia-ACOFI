@@ -555,6 +555,10 @@ type ConfiguracionEdicion = {
   colorFondoPortada?: string;
   colorFondoPaginasGlobal?: string;
   imagenFondoPortada?: string;
+  portadaBgBrightness?: number;
+  portadaBgContrast?: number;
+  portadaBgOverlayOpacity?: number;
+  portadaBgBlur?: number;
   logoUrl?: string;
   logoSize?: number;
   logoBrightness?: number;
@@ -620,14 +624,12 @@ const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
     return resultado;
   };
 
-  // Filtrar filas que estén 100% vacías (muy común al seleccionar de más en Excel)
   const matrizSinFilasVacias = lineas
     .map(l => parsearLinea(l, delimitador))
     .filter(fila => fila.some(celda => celda.trim() !== ''));
 
   if (matrizSinFilasVacias.length === 0) return [];
 
-  // Detectar la última columna que realmente tiene algún dato en cualquier fila para descartar columnas vacías sobrantes de Excel
   let ultimaColConDatos = 0;
   matrizSinFilasVacias.forEach(fila => {
     fila.forEach((celda, cIdx) => {
@@ -644,7 +646,6 @@ const parsearTextoExcelOCsv = (textoCrudo: string): string[][] => {
     while (filaRecortada.length < numColumnasReales) {
       filaRecortada.push(fIdx === 0 ? `Columna ${filaRecortada.length + 1}` : '0');
     }
-    // Asegurar que ninguna cabecera de la fila 0 quede vacía
     if (fIdx === 0) {
       return filaRecortada.map((celda, cIdx) => celda.trim() || `Columna ${cIdx + 1}`);
     }
@@ -673,6 +674,10 @@ export default function AdminPage() {
     paginasMarcaAgua: [],
     colorFondoPortada: '#fdfbf7',
     colorFondoPaginasGlobal: '#fdfbf7',
+    portadaBgBrightness: 100,
+    portadaBgContrast: 100,
+    portadaBgOverlayOpacity: 85,
+    portadaBgBlur: 2,
     logoSize: 56,
     logoBrightness: 100,
     marcaAguaSize: 40,
@@ -809,6 +814,10 @@ export default function AdminPage() {
       paginasMarcaAgua: [],
       colorFondoPortada: '#fdfbf7',
       colorFondoPaginasGlobal: '#fdfbf7',
+      portadaBgBrightness: 100,
+      portadaBgContrast: 100,
+      portadaBgOverlayOpacity: 85,
+      portadaBgBlur: 2,
       logoSize: 56,
       logoBrightness: 100,
       marcaAguaSize: 40,
@@ -1109,7 +1118,6 @@ export default function AdminPage() {
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueTabla;
     if (!bloque || bloque.tipo !== 'tabla') return;
 
-    // Si el usuario pega un rango grande en la celda (0,0), ajustamos exactamente al tamaño del bloque de Excel pegado para no dejar filas/columnas viejas huérfanas
     if (filaInicio === 0 && colInicio === 0 && matrizClipboard.length >= 2 && (matrizClipboard[0]?.length || 0) >= 2) {
       bloque.data = matrizClipboard;
       sincronizarGraficasConTabla(nuevasPaginas, bloque.id, bloque.data);
@@ -2255,6 +2263,42 @@ export default function AdminPage() {
     }
   };
 
+  // MOVER EL ORDEN DE LAS SERIES DEL EJE Y (Y SUS COLORES) ARRIBA O ABAJO
+  const moverOrdenEjeY = (bloqueId: string, colIdx: number, direccion: 'arriba' | 'abajo') => {
+    const nuevasPaginas = [...paginas];
+    const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueGrafica;
+    if (!bloque || bloque.tipo !== 'grafica') return;
+
+    const tablaFuente = todasLasTablasAdmin.find(t => t.id === bloque.tablaRef);
+    const totalCols = tablaFuente?.data?.[0]?.length || 0;
+    const ejeXActual = Number(bloque.ejeX) || 0;
+
+    let listaActual = Array.isArray(bloque.ejesY) && bloque.ejesY.length > 0
+      ? [...bloque.ejesY]
+      : Array.from({ length: totalCols }, (_, idx) => idx).filter(idx => idx !== ejeXActual);
+
+    const posActual = listaActual.indexOf(colIdx);
+    if (posActual === -1) return;
+
+    const posDestino = direccion === 'arriba' ? posActual - 1 : posActual + 1;
+    if (posDestino < 0 || posDestino >= listaActual.length) return;
+
+    const temp = listaActual[posActual];
+    listaActual[posActual] = listaActual[posDestino];
+    listaActual[posDestino] = temp;
+    bloque.ejesY = listaActual;
+
+    const paletaActiva = obtenerPaletaActivaBloque(bloque);
+    const coloresActuales = [...(bloque.coloresCustom || [])];
+    const cActual = coloresActuales[posActual] || paletaActiva[posActual % paletaActiva.length];
+    const cDestino = coloresActuales[posDestino] || paletaActiva[posDestino % paletaActiva.length];
+    coloresActuales[posActual] = cDestino;
+    coloresActuales[posDestino] = cActual;
+    bloque.coloresCustom = coloresActuales;
+
+    autoGuardar(nuevasPaginas);
+  };
+
   const aplicarPaletaAGrafica = (bloqueId: string, clavePaleta: string) => {
     const paleta = PALETAS_GRAFICAS[clavePaleta];
     if (!paleta) return;
@@ -2838,7 +2882,6 @@ export default function AdminPage() {
     return COLORES_GRAFICAS_DEFAULT;
   };
 
-  // FORMATEADOR DE DATOS 100% BLINDADO CONTRA CRASHES DE RECHARTS AL PEGAR DESDE EXCEL
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = todasLasTablasAdmin.find(t => t.id === bloqueGrafica.tablaRef);
     if (!tablaFuente || !Array.isArray(tablaFuente.data) || tablaFuente.data.length < 2) {
@@ -2851,8 +2894,6 @@ export default function AdminPage() {
       return { datos: [], cabeceras: [], ejesYUsar: [], sufijoPorcentaje: false, columnasPorcentaje: {} as Record<string, boolean> };
     }
 
-    // Recharts interpreta el carácter "." en dataKey como ruta anidada y colapsa la página si una cabecera de Excel tiene abreviaturas (ej. "Ing. Civil" o "No.").
-    // Lo reemplazamos por "․" (U+2024, idéntico visualmente pero seguro para Recharts) y garantizamos unicidad absoluta.
     const conteoNombres: Record<string, number> = {};
     const cabeceras = cabecerasOriginales.map((c, i) => {
       let limpio = String(c ?? '')
@@ -2870,7 +2911,6 @@ export default function AdminPage() {
       return limpio;
     });
 
-    // Filtrar filas que estén completamente vacías
     const filas = tablaFuente.data
       .slice(1)
       .filter(f => Array.isArray(f) && f.some(celda => String(celda ?? '').trim() !== ''));
@@ -2882,7 +2922,6 @@ export default function AdminPage() {
     const rawEjeX = Number(bloqueGrafica.ejeX);
     const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
 
-    // Filtrar cualquier índice de eje Y que haya quedado fuera de rango tras pegar una tabla con menos columnas
     let ejesYValidos: number[] = [];
     if (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY)) {
       ejesYValidos = Array.from(
@@ -2925,11 +2964,11 @@ export default function AdminPage() {
       const esPorcMapa = rawVal.includes('%') || !!columnasPorcentaje[nombreCabMapa];
 
       const obj: any = { 
-        name: String(fila?.[ejeXSeguro] ?? `Ítem ${fIdx + 1}`).trim() || `Ítem ${fIdx + 1}`,
-        valorMapa: parseValor(fila?.[indiceMapa]),
-        esPorcentaje: esPorcMapa,
-        _idx: fIdx,
-        fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
+          name: String(fila?.[ejeXSeguro] ?? `Ítem ${fIdx + 1}`).trim() || `Ítem ${fIdx + 1}`,
+          valorMapa: parseValor(fila?.[indiceMapa]),
+          esPorcentaje: esPorcMapa,
+          _idx: fIdx,
+          fill: bloqueGrafica.coloresCustom?.[fIdx] || paletaBase[fIdx % paletaBase.length]
       };
       ejesYValidos.forEach(idx => {
         const nombreCabecera = cabeceras[idx];
@@ -2943,7 +2982,28 @@ export default function AdminPage() {
     return { datos: datosFormateados, cabeceras, ejesYUsar: ejesYValidos, sufijoPorcentaje: detectaPorcentajeGlobal, columnasPorcentaje };
   };
 
-  // RENDERIZADOR REAL DE GRÁFICAS CON VALIDACIÓN SEGURA DE ESCALAS Y DOMINIO NUMÉRICO
+  // LEYENDA PERSONALIZADA QUE RESPETA ESTRICTAMENTE EL ORDEN EN QUE SE SELECCIONARON LOS EJES Y
+  const renderizarLeyendaEnOrden = (props: any, nombresEjesY: string[], paletaActiva: string[], bloque: BloqueGrafica) => {
+    const { payload } = props;
+    if (!payload || payload.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-4 pt-5 font-sans text-xs font-bold text-stone-700">
+        {nombresEjesY.map((nombreSerie, idx) => {
+          const colorSerie = bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length];
+          const nombreLimpio = nombreSerie.replace(/․/g, '.');
+          return (
+            <div key={nombreSerie} className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: colorSerie }} />
+              <span>{nombreLimpio}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // RENDERIZADOR REAL DE GRÁFICAS CON LEYENDA EN ORDEN Y DOMINIO SEGURO
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
@@ -2957,7 +3017,6 @@ export default function AdminPage() {
     const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
-    // Cálculo seguro del dominio numérico (evita bloqueos si min >= max de los nuevos datos pegados)
     let maxDatoReal = 0;
     datos.forEach((d: any) => {
       nombresEjesY.forEach(n => {
@@ -3005,7 +3064,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -3040,7 +3099,7 @@ export default function AdminPage() {
               <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -3081,7 +3140,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -3114,7 +3173,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 return (
@@ -3354,9 +3413,9 @@ export default function AdminPage() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={nombreY.replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter 
                   key={nombre} 
@@ -3382,7 +3441,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line 
                   type={bloque.tipoGrafica === 'lineas_curvas' ? 'natural' : 'linear'} 
@@ -3411,7 +3470,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area 
                   type="monotone" 
@@ -3439,7 +3498,7 @@ export default function AdminPage() {
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 if (i === nombresEjesY.length - 1 && nombresEjesY.length > 1) {
@@ -3468,7 +3527,7 @@ export default function AdminPage() {
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
               <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#94a3b8', fontSize: 10 }} />
               <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar 
                   key={nombre} 
@@ -3743,12 +3802,25 @@ export default function AdminPage() {
         <div className="w-full bg-[#fdfbf7] font-serif text-stone-900 print-book-wrapper">
           <div className="max-w-5xl mx-auto">
             
-            {/* Portada en PDF */}
+            {/* Portada en PDF con ajustes de luminosidad, contraste, desenfoque y opacidad */}
             <div className="print-page-sheet flex flex-col items-center justify-center text-center px-10 py-24 relative" style={{ backgroundColor: configuracion.colorFondoPortada || '#fdfbf7' }}>
               {configuracion.imagenFondoPortada && (
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                  <img src={configuracion.imagenFondoPortada} alt="Fondo Portada" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0" style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }} />
+                  <img 
+                    src={configuracion.imagenFondoPortada} 
+                    alt="Fondo Portada" 
+                    className="w-full h-full object-cover" 
+                    style={{ 
+                      filter: `brightness(${configuracion.portadaBgBrightness ?? 100}%) contrast(${configuracion.portadaBgContrast ?? 100}%) blur(${configuracion.portadaBgBlur ?? 2}px)` 
+                    }}
+                  />
+                  <div 
+                    className="absolute inset-0" 
+                    style={{ 
+                      backgroundColor: configuracion.colorFondoPortada || '#fdfbf7',
+                      opacity: (configuracion.portadaBgOverlayOpacity ?? 85) / 100
+                    }} 
+                  />
                 </div>
               )}
               <div className="relative z-10 flex flex-col items-center w-full">
@@ -4140,7 +4212,119 @@ export default function AdminPage() {
                     </div>
                     <div className="p-8">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <RenderUploadConfig campo="imagenFondoPortada" label="Imagen Fondo (Portada)" placeholder="URL de imagen de fondo..." />
+                        
+                        {/* IMAGEN DE FONDO DE PORTADA + CONTROLES DE LUMINOSIDAD, CONTRASTE, OPACIDAD Y DESENFOQUE */}
+                        <div className="space-y-4">
+                          <RenderUploadConfig campo="imagenFondoPortada" label="Imagen Fondo (Portada)" placeholder="URL de imagen de fondo..." />
+                          {configuracion.imagenFondoPortada && (
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-blue-700">Ajustes de Imagen de Portada</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nueva = {
+                                      ...configuracion,
+                                      portadaBgBrightness: 100,
+                                      portadaBgContrast: 100,
+                                      portadaBgOverlayOpacity: 85,
+                                      portadaBgBlur: 2
+                                    };
+                                    setConfiguracion(nueva);
+                                    autoGuardar(paginas, nueva);
+                                  }}
+                                  className="text-[10px] font-bold text-slate-400 hover:text-blue-600 cursor-pointer"
+                                >
+                                  Restablecer
+                                </button>
+                              </div>
+
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-1.5">
+                                  <span>Luminosidad (Brillo)</span>
+                                  <span className="text-blue-600">{configuracion.portadaBgBrightness ?? 100}%</span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="200"
+                                  value={configuracion.portadaBgBrightness ?? 100}
+                                  onChange={(e) => actualizarConfiguracion('portadaBgBrightness', Number(e.target.value))}
+                                  className="w-full accent-blue-600 cursor-pointer"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-1.5">
+                                  <span>Contraste</span>
+                                  <span className="text-blue-600">{configuracion.portadaBgContrast ?? 100}%</span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min="50"
+                                  max="200"
+                                  value={configuracion.portadaBgContrast ?? 100}
+                                  onChange={(e) => actualizarConfiguracion('portadaBgContrast', Number(e.target.value))}
+                                  className="w-full accent-blue-600 cursor-pointer"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-1.5">
+                                  <span>Opacidad del Velo de Fondo</span>
+                                  <span className="text-blue-600">{configuracion.portadaBgOverlayOpacity ?? 85}%</span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="98"
+                                  step="2"
+                                  value={configuracion.portadaBgOverlayOpacity ?? 85}
+                                  onChange={(e) => actualizarConfiguracion('portadaBgOverlayOpacity', Number(e.target.value))}
+                                  className="w-full accent-blue-600 cursor-pointer"
+                                />
+                                <span className="block text-[10px] text-slate-400 mt-0.5">0% = Imagen 100% libre • 85% = Velo suave detrás del texto</span>
+                              </div>
+
+                              <div>
+                                <label className="flex justify-between text-xs font-bold text-slate-600 uppercase mb-1.5">
+                                  <span>Desenfoque (Blur)</span>
+                                  <span className="text-blue-600">{configuracion.portadaBgBlur ?? 2}px</span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="20"
+                                  step="1"
+                                  value={configuracion.portadaBgBlur ?? 2}
+                                  onChange={(e) => actualizarConfiguracion('portadaBgBlur', Number(e.target.value))}
+                                  className="w-full accent-blue-600 cursor-pointer"
+                                />
+                              </div>
+
+                              <div className="h-24 rounded-xl overflow-hidden border border-slate-200 relative flex items-center justify-center bg-white">
+                                <img
+                                  src={configuracion.imagenFondoPortada}
+                                  alt="Vista Previa Portada"
+                                  className="w-full h-full object-cover transition-all"
+                                  style={{
+                                    filter: `brightness(${configuracion.portadaBgBrightness ?? 100}%) contrast(${configuracion.portadaBgContrast ?? 100}%) blur(${configuracion.portadaBgBlur ?? 2}px)`
+                                  }}
+                                />
+                                <div
+                                  className="absolute inset-0 transition-all"
+                                  style={{
+                                    backgroundColor: configuracion.colorFondoPortada || '#fdfbf7',
+                                    opacity: (configuracion.portadaBgOverlayOpacity ?? 85) / 100
+                                  }}
+                                />
+                                <span className="relative z-10 text-[10px] font-black uppercase tracking-wider text-slate-800 bg-white/85 px-2.5 py-1 rounded shadow-xs">
+                                  Previa Real de Portada
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         
                         <div className="space-y-4">
                           <RenderUploadConfig campo="logoUrl" label="Logo Superior (Páginas)" placeholder="URL del logo en PNG/SVG..." />
@@ -5845,7 +6029,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* CONFIGURADOR DE GRÁFICAS */}
+                          {/* CONFIGURADOR DE GRÁFICAS CON ORDEN PERSONALIZADO DE EJES Y */}
                           {bloque.tipo === 'grafica' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <input 
@@ -5919,6 +6103,15 @@ export default function AdminPage() {
                                   
                                   const usaColorPorFila = esGraficaPorSegmento(bloque.tipoGrafica) || (['barras', 'barras_horizontales', 'barras_4d'].includes(bloque.tipoGrafica) && ejesYUsar.length === 1);
                                   const paletaActiva = obtenerPaletaActivaBloque(bloque);
+                                  const ejeXActual = Number(bloque.ejeX) < cabeceras.length ? Number(bloque.ejeX) : 0;
+
+                                  // Ordenar la lista visual del selector: primero las seleccionadas en su orden exacto, luego las no seleccionadas
+                                  const todosIndicesCandidatos = cabeceras.map((_, idx) => idx).filter(idx => idx !== ejeXActual);
+                                  const seleccionadosOrdenados = (bloque.ejesY && bloque.ejesY.length > 0 ? bloque.ejesY : ejesYUsar).filter(
+                                    idx => idx < cabeceras.length && idx !== ejeXActual
+                                  );
+                                  const noSeleccionados = todosIndicesCandidatos.filter(idx => !seleccionadosOrdenados.includes(idx));
+                                  const ordenVisualSelector = [...seleccionadosOrdenados, ...noSeleccionados];
 
                                   return (
                                     <>
@@ -5928,7 +6121,7 @@ export default function AdminPage() {
                                           {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Ubicación (Departamento/Ciudad)' : 'Eje X (Categorías / Periodos)'}
                                         </label>
                                         <select 
-                                          value={Number(bloque.ejeX) < cabeceras.length ? bloque.ejeX : 0} 
+                                          value={ejeXActual} 
                                           onChange={(e) => actualizarGrafica(bloque.id, 'ejeX', Number(e.target.value))}
                                           className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
                                         >
@@ -5938,39 +6131,75 @@ export default function AdminPage() {
                                         </select>
                                       </div>
                                       
+                                      {/* SELECTOR DE EJES Y CON ORDEN EXACTO DE SELECCIÓN Y BOTONES ↑ / ↓ */}
                                       <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-                                          {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Valores Numéricos o %)'}
+                                          {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Se grafican en el orden que elijas)'}
                                         </label>
-                                        <div className="space-y-2 max-h-32 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
-                                          {cabeceras.map((cab, i) => {
-                                            const ejeXActual = Number(bloque.ejeX) < cabeceras.length ? Number(bloque.ejeX) : 0;
-                                            if (i === ejeXActual) return null; 
-                                            const isChecked = (bloque.ejesY || []).includes(i);
+                                        <div className="space-y-1.5 max-h-44 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
+                                          {ordenVisualSelector.map((colIdx) => {
+                                            const cab = cabeceras[colIdx];
+                                            const posEnSeleccion = seleccionadosOrdenados.indexOf(colIdx);
+                                            const isChecked = posEnSeleccion !== -1 && (bloque.ejesY && bloque.ejesY.length > 0 ? bloque.ejesY.includes(colIdx) : true);
+
                                             return (
-                                              <label key={i} className="flex items-center gap-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
-                                                <input 
-                                                  type="checkbox" 
-                                                  checked={isChecked}
-                                                  onChange={(e) => {
-                                                    let nuevosEjesY = [...(bloque.ejesY || [])].filter(idx => idx < cabeceras.length && idx !== ejeXActual);
-                                                    if (e.target.checked) {
-                                                      if (bloque.tipoGrafica === 'mapa_colombia') nuevosEjesY = [i];
-                                                      else nuevosEjesY.push(i);
-                                                    } else {
-                                                      nuevosEjesY = nuevosEjesY.filter(val => val !== i);
-                                                    }
-                                                    actualizarGrafica(bloque.id, 'ejesY', nuevosEjesY);
-                                                  }}
-                                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                {cab.replace(/․/g, '.') || `Columna ${i + 1}`}
-                                              </label>
+                                              <div
+                                                key={colIdx}
+                                                className={`flex items-center justify-between gap-2 p-1.5 rounded-lg border transition-colors ${
+                                                  isChecked ? 'bg-blue-50/60 border-blue-200' : 'hover:bg-slate-50 border-transparent'
+                                                }`}
+                                              >
+                                                <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700 cursor-pointer flex-1 min-w-0">
+                                                  <input 
+                                                    type="checkbox" 
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                      let baseActual = (bloque.ejesY && bloque.ejesY.length > 0 ? [...bloque.ejesY] : [...seleccionadosOrdenados]).filter(
+                                                        idx => idx < cabeceras.length && idx !== ejeXActual
+                                                      );
+                                                      if (e.target.checked) {
+                                                        if (bloque.tipoGrafica === 'mapa_colombia') baseActual = [colIdx];
+                                                        else if (!baseActual.includes(colIdx)) baseActual.push(colIdx);
+                                                      } else {
+                                                        baseActual = baseActual.filter(val => val !== colIdx);
+                                                      }
+                                                      actualizarGrafica(bloque.id, 'ejesY', baseActual);
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                                                  />
+                                                  {isChecked && (
+                                                    <span className="px-1.5 py-0.5 text-[10px] font-black bg-blue-600 text-white rounded shrink-0">
+                                                      #{posEnSeleccion + 1}
+                                                    </span>
+                                                  )}
+                                                  <span className="truncate font-semibold">{cab.replace(/․/g, '.') || `Columna ${colIdx + 1}`}</span>
+                                                </label>
+
+                                                {isChecked && seleccionadosOrdenados.length > 1 && (
+                                                  <div className="flex items-center gap-0.5 shrink-0">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => moverOrdenEjeY(bloque.id, colIdx, 'arriba')}
+                                                      disabled={posEnSeleccion === 0}
+                                                      className="p-1 text-slate-500 hover:text-blue-700 hover:bg-white rounded disabled:opacity-25 cursor-pointer"
+                                                      title="Subir prioridad en la gráfica y leyenda"
+                                                    >
+                                                      <ArrowUp size={13} />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => moverOrdenEjeY(bloque.id, colIdx, 'abajo')}
+                                                      disabled={posEnSeleccion === seleccionadosOrdenados.length - 1}
+                                                      className="p-1 text-slate-500 hover:text-blue-700 hover:bg-white rounded disabled:opacity-25 cursor-pointer"
+                                                      title="Bajar prioridad en la gráfica y leyenda"
+                                                    >
+                                                      <ArrowDown size={13} />
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
                                             );
                                           })}
-                                          {(!bloque.ejesY || bloque.ejesY.length === 0) && (
-                                            <p className="text-xs text-slate-400 italic">⚠️ El sistema usará automáticamente las columnas numéricas disponibles.</p>
-                                          )}
                                         </div>
                                       </div>
 
@@ -6164,7 +6393,7 @@ export default function AdminPage() {
                                                         onChange={(e) => actualizarGraficaColor(bloque.id, idx, e.target.value)} 
                                                         className="w-8 h-8 cursor-pointer rounded-md border shrink-0"
                                                       />
-                                                      <span className="text-sm font-bold text-slate-700 truncate">{nombreEje}</span>
+                                                      <span className="text-sm font-bold text-slate-700 truncate">#{idx + 1} — {nombreEje}</span>
                                                     </div>
                                                  );
                                               })}
