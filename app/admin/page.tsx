@@ -3811,7 +3811,7 @@ export default function AdminPage() {
           </div>
           <div className="p-5 border-t border-slate-100 bg-slate-50 space-y-3">
             <button onClick={descargarRespaldoJson} disabled={!edicionActiva} className="w-full flex justify-center items-center space-x-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-800 py-3 px-4 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all shadow-xs cursor-pointer">
-              <FileJson size={16} /> <span>Descargar Respaldo JSON</span>
+              <FileJson size={16} /> <span>Descargar JSON</span>
             </button>
             <button onClick={intentarDuplicarEdicion} disabled={guardando || !edicionActiva} className="w-full flex justify-center items-center space-x-2 bg-white border-2 border-slate-200 text-slate-700 py-3.5 px-4 rounded-xl text-sm font-bold hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all shadow-sm cursor-pointer">
               <Copy size={18} /> <span>Clonar Edición</span>
