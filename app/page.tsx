@@ -1167,7 +1167,7 @@ function LibroPublicoContent() {
     );
   };
 
-  const renderizarGrafica = (bloque: BloqueGrafica) => {
+ const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
 
@@ -1180,30 +1180,72 @@ function LibroPublicoContent() {
     const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
 
-    // Ordenador para que el cuadro flotante (Tooltip) al pasar el mouse respete el orden #1, #2, #3... y NO el orden alfabético
     const ordenarTooltipSegunSeleccion = (item: any) => {
       const clave = String(item?.dataKey ?? item?.name ?? '');
       const pos = nombresEjesY.indexOf(clave);
       return pos === -1 ? 999 : pos;
     };
 
-    const tieneMinManual = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && isFinite(Number(bloque.ejeYMin));
-    const tieneMaxManual = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && isFinite(Number(bloque.ejeYMax));
+    let maxDatoReal = 0;
+    datos.forEach((d: any) => {
+      nombresEjesY.forEach(n => {
+        const v = Number(d[n]);
+        if (isFinite(v) && v > maxDatoReal) maxDatoReal = v;
+      });
+    });
 
-    let minValConfig: number = tieneMinManual ? Number(bloque.ejeYMin) : 0;
-    let maxValConfig: number | 'auto' = tieneMaxManual ? Number(bloque.ejeYMax) : 'auto';
+    const strMin = bloque.ejeYMin !== undefined && bloque.ejeYMin !== null ? String(bloque.ejeYMin).trim() : '';
+    const strMax = bloque.ejeYMax !== undefined && bloque.ejeYMax !== null ? String(bloque.ejeYMax).trim() : '';
 
-    if (typeof maxValConfig === 'number' && minValConfig >= maxValConfig) {
-      minValConfig = 0;
-      maxValConfig = 'auto';
-    }
+    const numMinParsed = strMin !== '' ? parseValor(strMin) : NaN;
+    const numMaxParsed = strMax !== '' ? parseValor(strMax) : NaN;
 
-    // Usamos funciones exactas () => minValConfig y allowDataOverflow={permitirRecorteEje} para que Recharts jamás redondee 100000 a 90000 ni regrese a 0 cuando hay varias líneas
-    const dominioNumerico: any = [
-      tieneMinManual ? () => minValConfig : 0,
-      typeof maxValConfig === 'number' ? () => maxValConfig : 'auto'
-    ];
+    const tieneMinManual = strMin !== '' && isFinite(numMinParsed);
+    const tieneMaxManual = strMax !== '' && isFinite(numMaxParsed);
     const permitirRecorteEje = tieneMinManual || tieneMaxManual;
+
+    let dominioNumerico: [any, any] = [0, 'auto'];
+    let ticksPersonalizados: number[] | undefined = undefined;
+
+    if (tieneMinManual || tieneMaxManual) {
+      const minBase = tieneMinManual ? numMinParsed : 0;
+      let maxBase = tieneMaxManual ? numMaxParsed : maxDatoReal;
+
+      if (!tieneMaxManual) {
+        const rangoDatos = maxDatoReal > minBase ? (maxDatoReal - minBase) : Math.max(Math.abs(minBase) * 0.5, 100);
+        const pasoCrudo = rangoDatos / 4;
+        const mag = Math.pow(10, Math.floor(Math.log10(Math.max(pasoCrudo, 1e-6))));
+        const residual = pasoCrudo / mag;
+        let pasoLimpio = mag;
+        if (residual > 5) pasoLimpio = 10 * mag;
+        else if (residual > 2.5) pasoLimpio = 5 * mag;
+        else if (residual > 2) pasoLimpio = 2.5 * mag;
+        else if (residual > 1) pasoLimpio = 2 * mag;
+
+        maxBase = minBase + pasoLimpio * 4;
+        if (maxBase < maxDatoReal) {
+          maxBase = minBase + pasoLimpio * 5;
+        }
+
+        const numPasos = Math.round((maxBase - minBase) / pasoLimpio);
+        ticksPersonalizados = Array.from({ length: numPasos + 1 }, (_, idx) =>
+          Number((minBase + idx * pasoLimpio).toFixed(4))
+        );
+      } else if (maxBase > minBase) {
+        const pasoExacto = (maxBase - minBase) / 4;
+        ticksPersonalizados = [
+          Number(minBase.toFixed(4)),
+          Number((minBase + pasoExacto).toFixed(4)),
+          Number((minBase + pasoExacto * 2).toFixed(4)),
+          Number((minBase + pasoExacto * 3).toFixed(4)),
+          Number(maxBase.toFixed(4))
+        ];
+      }
+
+      if (maxBase > minBase) {
+        dominioNumerico = [minBase, maxBase];
+      }
+    }
 
     const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
     const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
@@ -1222,7 +1264,7 @@ function LibroPublicoContent() {
             <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1242,7 +1284,7 @@ function LibroPublicoContent() {
           <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
@@ -1270,7 +1312,7 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1302,7 +1344,7 @@ function LibroPublicoContent() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
@@ -1522,7 +1564,7 @@ function LibroPublicoContent() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1541,7 +1583,7 @@ function LibroPublicoContent() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1560,7 +1602,7 @@ function LibroPublicoContent() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -1578,7 +1620,7 @@ function LibroPublicoContent() {
             <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" domain={dominioNumerico} ticks={ticksPersonalizados} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
