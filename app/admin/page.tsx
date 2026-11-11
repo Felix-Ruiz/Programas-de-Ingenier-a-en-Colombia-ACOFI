@@ -1107,7 +1107,7 @@ export default function AdminPage() {
   ) => {
     const textoClipboard = e.clipboardData.getData('text');
     if (!textoClipboard || (!textoClipboard.includes('\t') && !textoClipboard.includes('\n'))) {
-      return; // Si es un texto simple de una sola celda, dejamos que actúe el pegado normal del navegador
+      return; 
     }
 
     e.preventDefault();
@@ -1156,7 +1156,6 @@ export default function AdminPage() {
     mostrarMensaje(`¡Rango de Excel desglosado en ${matrizClipboard.length} filas × ${matrizClipboard[0]?.length || 0} columnas! Gráficas actualizadas.`, 'exito');
   };
 
-  // FUNCIÓN DEL INYECTOR DE LOTES JSON INTELIGENTE
   const procesarInyeccionLoteJson = () => {
     if (!jsonLoteInput.trim()) {
       mostrarMensaje('Pega primero el bloque JSON de las páginas.', 'error');
@@ -2258,10 +2257,24 @@ export default function AdminPage() {
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueGrafica;
     if (bloque && bloque.tipo === 'grafica') {
       (bloque as any)[campo] = valor;
-      if (campo === 'tablaRef') { bloque.ejeX = 0; bloque.ejesY = []; }
+      if (campo === 'tablaRef') {
+        bloque.ejeX = 0;
+        const todasTablas = novasPaginasTablasHelper(nuevasPaginas);
+        const tSeleccionada = todasTablas.find(t => t.id === valor);
+        const numC = tSeleccionada?.data?.[0]?.length || 0;
+        bloque.ejesY = numC > 1 ? Array.from({ length: numC - 1 }, (_, idx) => idx + 1) : [];
+      } else if (campo === 'ejeX') {
+        const nuevoX = Number(valor) || 0;
+        if (Array.isArray(bloque.ejesY)) {
+          bloque.ejesY = bloque.ejesY.filter(idx => idx !== nuevoX);
+        }
+      }
       autoGuardar(nuevasPaginas);
     }
   };
+
+  const novasPaginasTablasHelper = (listaPaginas: Pagina[]) =>
+    listaPaginas.flatMap(p => p.bloques.filter(b => b.tipo === 'tabla') as BloqueTabla[]);
 
   // MOVER EL ORDEN DE LAS SERIES DEL EJE Y (Y SUS COLORES) ARRIBA O ABAJO
   const moverOrdenEjeY = (bloqueId: string, colIdx: number, direccion: 'arriba' | 'abajo') => {
@@ -2273,7 +2286,7 @@ export default function AdminPage() {
     const totalCols = tablaFuente?.data?.[0]?.length || 0;
     const ejeXActual = Number(bloque.ejeX) || 0;
 
-    let listaActual = Array.isArray(bloque.ejesY) && bloque.ejesY.length > 0
+    let listaActual = Array.isArray(bloque.ejesY)
       ? [...bloque.ejesY]
       : Array.from({ length: totalCols }, (_, idx) => idx).filter(idx => idx !== ejeXActual);
 
@@ -2882,6 +2895,7 @@ export default function AdminPage() {
     return COLORES_GRAFICAS_DEFAULT;
   };
 
+  // FORMATEADOR DE DATOS: RESPETA CUANDO EL USUARIO DESMARCA TODAS LAS OPCIONES (ejesY = []) SIN VOLVERLAS A MARCAR SOLAS
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = todasLasTablasAdmin.find(t => t.id === bloqueGrafica.tablaRef);
     if (!tablaFuente || !Array.isArray(tablaFuente.data) || tablaFuente.data.length < 2) {
@@ -2922,8 +2936,9 @@ export default function AdminPage() {
     const rawEjeX = Number(bloqueGrafica.ejeX);
     const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
 
+    // Si bloqueGrafica.ejesY es un arreglo (incluso vacío []), respetamos estrictamente lo que haya marcado el usuario
     let ejesYValidos: number[] = [];
-    if (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY)) {
+    if (Array.isArray(bloqueGrafica.ejesY)) {
       ejesYValidos = Array.from(
         new Set(
           bloqueGrafica.ejesY
@@ -2931,13 +2946,8 @@ export default function AdminPage() {
             .filter(idx => !isNaN(idx) && idx >= 0 && idx < totalColumnas && idx !== ejeXSeguro)
         )
       );
-    }
-
-    if (ejesYValidos.length === 0) {
+    } else {
       ejesYValidos = cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
-    }
-    if (ejesYValidos.length === 0) {
-      ejesYValidos = [0];
     }
 
     const indiceMapa = ejesYValidos[0] ?? 0;
@@ -3003,10 +3013,16 @@ export default function AdminPage() {
     );
   };
 
-  // RENDERIZADOR REAL DE GRÁFICAS CON LEYENDA EN ORDEN Y DOMINIO SEGURO
+  // RENDERIZADOR REAL DE GRÁFICAS CON TOOLTIP Y LEYENDA EN EL MISMO ORDEN EXACTO DE SELECCIÓN (#1, #2, #3...)
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
-    if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
+    if (datos.length === 0 || ejesYUsar.length === 0) {
+      return (
+        <div className="p-8 text-center text-stone-400 italic">
+          {datos.length === 0 ? 'Faltan datos en la tabla conectada.' : 'Selecciona al menos una casilla en Ejes Y para visualizar la gráfica.'}
+        </div>
+      );
+    }
 
     const nombresEjesY = ejesYUsar.map(idx => cabeceras[idx]).filter(Boolean);
     if (nombresEjesY.length === 0) return <div className="p-8 text-center text-stone-400 italic">Selecciona al menos una columna numérica para graficar.</div>;
@@ -3016,6 +3032,13 @@ export default function AdminPage() {
     const paletaActiva = obtenerPaletaActivaBloque(bloque);
     const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
+
+    // Ordenador para que el cuadro flotante (Tooltip) al pasar el mouse respete el orden #1, #2, #3... y NO el orden alfabético
+    const ordenarTooltipSegunSeleccion = (item: any) => {
+      const clave = String(item?.dataKey ?? item?.name ?? '');
+      const pos = nombresEjesY.indexOf(clave);
+      return pos === -1 ? 999 : pos;
+    };
 
     let maxDatoReal = 0;
     datos.forEach((d: any) => {
@@ -3063,7 +3086,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
@@ -3098,7 +3121,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
               <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
@@ -3139,7 +3162,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
@@ -3172,7 +3195,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
@@ -3414,7 +3437,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter 
@@ -3440,7 +3463,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line 
@@ -3469,7 +3492,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area 
@@ -3497,7 +3520,7 @@ export default function AdminPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
@@ -3526,7 +3549,7 @@ export default function AdminPage() {
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#cbd5e1" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
               <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar 
@@ -6029,7 +6052,7 @@ export default function AdminPage() {
                             </div>
                           )}
 
-                          {/* CONFIGURADOR DE GRÁFICAS CON ORDEN PERSONALIZADO DE EJES Y */}
+                          {/* CONFIGURADOR DE GRÁFICAS CON ORDEN PERSONALIZADO DE EJES Y Y DESELECCIÓN REAL */}
                           {bloque.tipo === 'grafica' && (
                             <div className="p-6 rounded-b-2xl" style={{ backgroundColor: bloque.colorFondo || '#ffffff' }}>
                               <input 
@@ -6105,11 +6128,8 @@ export default function AdminPage() {
                                   const paletaActiva = obtenerPaletaActivaBloque(bloque);
                                   const ejeXActual = Number(bloque.ejeX) < cabeceras.length ? Number(bloque.ejeX) : 0;
 
-                                  // Ordenar la lista visual del selector: primero las seleccionadas en su orden exacto, luego las no seleccionadas
                                   const todosIndicesCandidatos = cabeceras.map((_, idx) => idx).filter(idx => idx !== ejeXActual);
-                                  const seleccionadosOrdenados = (bloque.ejesY && bloque.ejesY.length > 0 ? bloque.ejesY : ejesYUsar).filter(
-                                    idx => idx < cabeceras.length && idx !== ejeXActual
-                                  );
+                                  const seleccionadosOrdenados = ejesYUsar;
                                   const noSeleccionados = todosIndicesCandidatos.filter(idx => !seleccionadosOrdenados.includes(idx));
                                   const ordenVisualSelector = [...seleccionadosOrdenados, ...noSeleccionados];
 
@@ -6131,16 +6151,38 @@ export default function AdminPage() {
                                         </select>
                                       </div>
                                       
-                                      {/* SELECTOR DE EJES Y CON ORDEN EXACTO DE SELECCIÓN Y BOTONES ↑ / ↓ */}
+                                      {/* SELECTOR DE EJES Y CON BOTONES RÁPIDOS DE MARCAR/DESMARCAR TODAS Y ORDEN EXACTO */}
                                       <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-                                          {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Se grafican en el orden que elijas)'}
-                                        </label>
-                                        <div className="space-y-1.5 max-h-44 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                            {bloque.tipoGrafica === 'mapa_colombia' ? 'Columna de Valores a Mapear' : 'Ejes Y (Se grafican en el orden que elijas)'}
+                                          </label>
+                                          {bloque.tipoGrafica !== 'mapa_colombia' && (
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => actualizarGrafica(bloque.id, 'ejesY', todosIndicesCandidatos)}
+                                                className="text-[10px] font-black text-blue-600 hover:underline cursor-pointer"
+                                              >
+                                                Marcar todas
+                                              </button>
+                                              <span className="text-slate-300">|</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => actualizarGrafica(bloque.id, 'ejesY', [])}
+                                                className="text-[10px] font-black text-red-500 hover:underline cursor-pointer"
+                                              >
+                                                Desmarcar todas
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <div className="space-y-1.5 max-h-48 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
                                           {ordenVisualSelector.map((colIdx) => {
                                             const cab = cabeceras[colIdx];
                                             const posEnSeleccion = seleccionadosOrdenados.indexOf(colIdx);
-                                            const isChecked = posEnSeleccion !== -1 && (bloque.ejesY && bloque.ejesY.length > 0 ? bloque.ejesY.includes(colIdx) : true);
+                                            const isChecked = posEnSeleccion !== -1;
 
                                             return (
                                               <div
@@ -6154,9 +6196,7 @@ export default function AdminPage() {
                                                     type="checkbox" 
                                                     checked={isChecked}
                                                     onChange={(e) => {
-                                                      let baseActual = (bloque.ejesY && bloque.ejesY.length > 0 ? [...bloque.ejesY] : [...seleccionadosOrdenados]).filter(
-                                                        idx => idx < cabeceras.length && idx !== ejeXActual
-                                                      );
+                                                      let baseActual = [...seleccionadosOrdenados];
                                                       if (e.target.checked) {
                                                         if (bloque.tipoGrafica === 'mapa_colombia') baseActual = [colIdx];
                                                         else if (!baseActual.includes(colIdx)) baseActual.push(colIdx);
