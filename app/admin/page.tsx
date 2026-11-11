@@ -2252,6 +2252,9 @@ export default function AdminPage() {
     }
   };
 
+  const novasPaginasTablasHelper = (listaPaginas: Pagina[]) =>
+    listaPaginas.flatMap(p => p.bloques.filter(b => b.tipo === 'tabla') as BloqueTabla[]);
+
   const actualizarGrafica = (bloqueId: string, campo: keyof BloqueGrafica, valor: any) => {
     const nuevasPaginas = [...paginas];
     const bloque = nuevasPaginas[indicePaginaActual].bloques.find(b => b.id === bloqueId) as BloqueGrafica;
@@ -2272,9 +2275,6 @@ export default function AdminPage() {
       autoGuardar(nuevasPaginas);
     }
   };
-
-  const novasPaginasTablasHelper = (listaPaginas: Pagina[]) =>
-    listaPaginas.flatMap(p => p.bloques.filter(b => b.tipo === 'tabla') as BloqueTabla[]);
 
   // MOVER EL ORDEN DE LAS SERIES DEL EJE Y (Y SUS COLORES) ARRIBA O ABAJO
   const moverOrdenEjeY = (bloqueId: string, colIdx: number, direccion: 'arriba' | 'abajo') => {
@@ -2936,7 +2936,6 @@ export default function AdminPage() {
     const rawEjeX = Number(bloqueGrafica.ejeX);
     const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
 
-    // Si bloqueGrafica.ejesY es un arreglo (incluso vacío []), respetamos estrictamente lo que haya marcado el usuario
     let ejesYValidos: number[] = [];
     if (Array.isArray(bloqueGrafica.ejesY)) {
       ejesYValidos = Array.from(
@@ -3013,7 +3012,7 @@ export default function AdminPage() {
     );
   };
 
-  // RENDERIZADOR REAL DE GRÁFICAS CON TOOLTIP Y LEYENDA EN EL MISMO ORDEN EXACTO DE SELECCIÓN (#1, #2, #3...)
+  // RENDERIZADOR REAL DE GRÁFICAS CON DOMINIO EXACTO FORZADO (SIN REDONDEO A 90000 NI REGRESO A 0 EN MÚLTIPLES SERIES)
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) {
@@ -3040,29 +3039,23 @@ export default function AdminPage() {
       return pos === -1 ? 999 : pos;
     };
 
-    let maxDatoReal = 0;
-    datos.forEach((d: any) => {
-      nombresEjesY.forEach(n => {
-        const v = Number(d[n]) || 0;
-        if (v > maxDatoReal) maxDatoReal = v;
-      });
-    });
+    const tieneMinManual = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && isFinite(Number(bloque.ejeYMin));
+    const tieneMaxManual = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && isFinite(Number(bloque.ejeYMax));
 
-    let minValConfig = bloque.ejeYMin !== undefined && String(bloque.ejeYMin).trim() !== '' && isFinite(Number(bloque.ejeYMin))
-      ? Number(bloque.ejeYMin)
-      : 0;
-    let maxValConfig: number | 'auto' = bloque.ejeYMax !== undefined && String(bloque.ejeYMax).trim() !== '' && isFinite(Number(bloque.ejeYMax))
-      ? Number(bloque.ejeYMax)
-      : 'auto';
+    let minValConfig: number = tieneMinManual ? Number(bloque.ejeYMin) : 0;
+    let maxValConfig: number | 'auto' = tieneMaxManual ? Number(bloque.ejeYMax) : 'auto';
 
     if (typeof maxValConfig === 'number' && minValConfig >= maxValConfig) {
       minValConfig = 0;
       maxValConfig = 'auto';
-    } else if (maxValConfig === 'auto' && maxDatoReal > 0 && minValConfig >= maxDatoReal) {
-      minValConfig = 0;
     }
 
-    const dominioNumerico: [number, number | 'auto'] = [minValConfig, maxValConfig];
+    // Usamos funciones exactas () => minValConfig y allowDataOverflow={permitirRecorteEje} para que Recharts jamás redondee 100000 a 90000 ni regrese a 0 cuando hay varias líneas
+    const dominioNumerico: any = [
+      tieneMinManual ? () => minValConfig : 0,
+      typeof maxValConfig === 'number' ? () => maxValConfig : 'auto'
+    ];
+    const permitirRecorteEje = tieneMinManual || tieneMaxManual;
 
     const barSizeProp = bloque.grosorBarra && Number(bloque.grosorBarra) > 0 ? Number(bloque.grosorBarra) : undefined;
     const categoryGapProp = bloque.espacioEntreBarras !== undefined ? `${bloque.espacioEntreBarras}%` : '20%';
@@ -3085,7 +3078,7 @@ export default function AdminPage() {
             <BarChart data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3119,7 +3112,7 @@ export default function AdminPage() {
           <ResponsiveContainer width="100%" height={altoContenedor}>
             <BarChart layout="vertical" data={datos} barCategoryGap={categoryGapProp} barGap={2} margin={{ top: 20, right: 55, left: bloque.ocultarEjeX ? 10 : 40, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
-              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <XAxis type="number" domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
@@ -3161,7 +3154,7 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3194,7 +3187,7 @@ export default function AdminPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
@@ -3436,7 +3429,7 @@ export default function AdminPage() {
             <ScatterChart margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3462,7 +3455,7 @@ export default function AdminPage() {
             <LineChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3491,7 +3484,7 @@ export default function AdminPage() {
             <AreaChart data={datos} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3519,7 +3512,7 @@ export default function AdminPage() {
             <ComposedChart data={datos} barCategoryGap={categoryGapProp} margin={{ top: 28, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
-              <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
+              <YAxis domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
@@ -3548,7 +3541,7 @@ export default function AdminPage() {
             <RadarChart cx="50%" cy="50%" outerRadius="78%" data={datos}>
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#cbd5e1" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />}
-              <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <PolarRadiusAxis angle={30} domain={dominioNumerico} allowDataOverflow={permitirRecorteEje} tick={{ fill: '#94a3b8', fontSize: 10 }} />
               <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
@@ -3811,7 +3804,7 @@ export default function AdminPage() {
           </div>
           <div className="p-5 border-t border-slate-100 bg-slate-50 space-y-3">
             <button onClick={descargarRespaldoJson} disabled={!edicionActiva} className="w-full flex justify-center items-center space-x-2 bg-emerald-50 border-2 border-emerald-200 text-emerald-800 py-3 px-4 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all shadow-xs cursor-pointer">
-              <FileJson size={16} /> <span>Descargar JSON</span>
+              <FileJson size={16} /> <span>Descargar Respaldo JSON</span>
             </button>
             <button onClick={intentarDuplicarEdicion} disabled={guardando || !edicionActiva} className="w-full flex justify-center items-center space-x-2 bg-white border-2 border-slate-200 text-slate-700 py-3.5 px-4 rounded-xl text-sm font-bold hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all shadow-sm cursor-pointer">
               <Copy size={18} /> <span>Clonar Edición</span>
@@ -4622,7 +4615,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* CONFIGURACIÓN DE IMAGEN DE FONDO DE PÁGINA (IGUAL QUE EN LA PORTADA) */}
-                    <div className="pt-4 border-t border-slate-100 bg-slate-50/70 p-4 rounded-xl border space-y-4">
+                    <div className="pt-4 border-t border-slate-100 bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-black uppercase tracking-widest text-slate-600 flex items-center gap-2">
                           <ImagePlus size={15} className="text-blue-600" /> Imagen de Fondo Exclusiva para esta Página (Igual que en Portada)
@@ -6286,11 +6279,11 @@ export default function AdminPage() {
                                           <input
                                             type="number"
                                             step="any"
-                                            placeholder="0 (Ej: 20)"
+                                            placeholder="0 (Ej: 100000)"
                                             value={bloque.ejeYMin !== undefined ? bloque.ejeYMin : ''}
                                             onChange={(e) => actualizarGrafica(bloque.id, 'ejeYMin', e.target.value)}
                                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500"
-                                            title="Define desde qué número empieza el eje vertical (Ej: escribe 20 para que la gráfica inicie en 20% en lugar de 0%)"
+                                            title="Define exactamente desde qué número empieza el eje vertical sin redondeos automáticos"
                                           />
                                         </div>
 
@@ -6301,11 +6294,11 @@ export default function AdminPage() {
                                           <input
                                             type="number"
                                             step="any"
-                                            placeholder="Automático (Ej: 30)"
+                                            placeholder="Automático (Ej: 300000)"
                                             value={bloque.ejeYMax !== undefined ? bloque.ejeYMax : ''}
                                             onChange={(e) => actualizarGrafica(bloque.id, 'ejeYMax', e.target.value)}
                                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500"
-                                            title="Déjalo vacío para cálculo automático o escribe el tope máximo del eje"
+                                            title="Déjalo vacío para cálculo automático o escribe el tope máximo exacto del eje"
                                           />
                                         </div>
 
