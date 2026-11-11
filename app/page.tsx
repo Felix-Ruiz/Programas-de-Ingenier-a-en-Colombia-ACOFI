@@ -425,6 +425,10 @@ type ConfiguracionEdicion = {
   colorFondoPortada?: string;
   colorFondoPaginasGlobal?: string;
   imagenFondoPortada?: string;
+  portadaBgBrightness?: number;
+  portadaBgContrast?: number;
+  portadaBgOverlayOpacity?: number;
+  portadaBgBlur?: number;
   logoUrl?: string;
   logoSize?: number;
   logoBrightness?: number;
@@ -1039,7 +1043,7 @@ function LibroPublicoContent() {
     return COLORES_GRAFICAS_DEFAULT;
   };
 
-  // FORMATEADOR 100% BLINDADO PARA RECHARTS (ESCAPA PUNTOS "." EN CABECERAS DE EXCEL Y EVITA ÍNDICES FUERA DE RANGO)
+  // FORMATEADOR 100% BLINDADO PARA RECHARTS (ESCAPA PUNTOS "." EN CABECERAS DE EXCEL Y RESPETA EL ORDEN DE SELECCIÓN)
   const formatearDatosParaGrafica = (bloqueGrafica: BloqueGrafica) => {
     const tablaFuente = mapaTablasPorId[bloqueGrafica.tablaRef];
     if (!tablaFuente || !Array.isArray(tablaFuente.data) || tablaFuente.data.length < 2) {
@@ -1081,7 +1085,7 @@ function LibroPublicoContent() {
     const ejeXSeguro = !isNaN(rawEjeX) && rawEjeX >= 0 && rawEjeX < totalColumnas ? rawEjeX : 0;
 
     let ejesYValidos: number[] = [];
-    if (bloqueGrafica.ejesY && Array.isArray(bloqueGrafica.ejesY)) {
+    if (Array.isArray(bloqueGrafica.ejesY)) {
       ejesYValidos = Array.from(
         new Set(
           bloqueGrafica.ejesY
@@ -1089,13 +1093,8 @@ function LibroPublicoContent() {
             .filter(idx => !isNaN(idx) && idx >= 0 && idx < totalColumnas && idx !== ejeXSeguro)
         )
       );
-    }
-
-    if (ejesYValidos.length === 0) {
+    } else {
       ejesYValidos = cabeceras.map((_, i) => i).filter(i => i !== ejeXSeguro);
-    }
-    if (ejesYValidos.length === 0) {
-      ejesYValidos = [0];
     }
 
     const indiceMapa = ejesYValidos[0] ?? 0;
@@ -1147,6 +1146,27 @@ function LibroPublicoContent() {
     };
     return alias[t] || t;
   };
+  // LEYENDA PERSONALIZADA QUE RESPETA ESTRICTAMENTE EL ORDEN EN QUE SE SELECCIONARON LOS EJES Y
+  const renderizarLeyendaEnOrden = (props: any, nombresEjesY: string[], paletaActiva: string[], bloque: BloqueGrafica) => {
+    const { payload } = props;
+    if (!payload || payload.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-4 pt-5 font-sans text-xs font-bold text-stone-700">
+        {nombresEjesY.map((nombreSerie, idx) => {
+          const colorSerie = bloque.coloresCustom?.[idx] || paletaActiva[idx % paletaActiva.length];
+          const nombreLimpio = nombreSerie.replace(/․/g, '.');
+          return (
+            <div key={nombreSerie} className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: colorSerie }} />
+              <span>{nombreLimpio}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderizarGrafica = (bloque: BloqueGrafica) => {
     const { datos, cabeceras, ejesYUsar, sufijoPorcentaje, columnasPorcentaje } = formatearDatosParaGrafica(bloque);
     if (datos.length === 0 || ejesYUsar.length === 0) return <div className="p-8 text-center text-stone-400 italic">Faltan datos en la tabla conectada.</div>;
@@ -1159,6 +1179,13 @@ function LibroPublicoContent() {
     const paletaActiva = obtenerPaletaActivaBloque(bloque);
     const altoContenedor = Math.max(200, Math.min(900, Number(bloque.alturaGrafica) || 380));
     const radioPastel = Math.max(80, Math.min(220, Math.round(altoContenedor * 0.34)));
+
+    // Ordenador para que el cuadro flotante (Tooltip) al pasar el mouse respete el orden #1, #2, #3... y NO el orden alfabético
+    const ordenarTooltipSegunSeleccion = (item: any) => {
+      const clave = String(item?.dataKey ?? item?.name ?? '');
+      const pos = nombresEjesY.indexOf(clave);
+      return pos === -1 ? 999 : pos;
+    };
 
     // Cálculo seguro del dominio numérico (evita bloqueos si min >= max de los nuevos datos pegados)
     let maxDatoReal = 0;
@@ -1203,8 +1230,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
@@ -1224,8 +1251,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e7e5e4" />
               <XAxis type="number" domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
               <YAxis type="category" dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={90} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar key={nombre} dataKey={nombre} barSize={barSizeProp} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} radius={[0, 6, 6, 0]} isAnimationActive={false}>
                   {unicaSerie && datos.map((_: any, idx: number) => (
@@ -1251,8 +1278,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Bar 
                   key={nombre} 
@@ -1283,8 +1310,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12, fontWeight: 'bold' }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} cursor={{ fill: '#f5f5f4' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.15)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const baseColor = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 return (
@@ -1503,8 +1530,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
               <XAxis type="category" dataKey="name" name="Categoría" hide={!!bloque.ocultarEjeX} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis type="number" dataKey={nombreY} name={String(nombreY).replace(/․/g, '.')} domain={dominioNumerico} allowDataOverflow={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} cursor={{ strokeDasharray: '3 3' }} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Scatter key={nombre} name={nombre} data={datos} isAnimationActive={false} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1522,8 +1549,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Line type={bloque.tipoGrafica === 'lineas_curvas' ? 'natural' : 'linear'} key={nombre} dataKey={nombre} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} strokeWidth={3.5} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1541,8 +1568,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Area type="monotone" key={nombre} dataKey={nombre} stackId={bloque.tipoGrafica === 'area_apilada' ? '1' : undefined} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fillOpacity={0.65} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 11, fontWeight: 'bold' }} />}
@@ -1559,8 +1586,8 @@ function LibroPublicoContent() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
               <XAxis dataKey="name" hide={!!bloque.ocultarEjeX} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
               <YAxis domain={dominioNumerico} allowDataOverflow={false} tickLine={false} axisLine={false} tick={{ fill: '#78716c', fontSize: 12 }} tickFormatter={(v) => sufijoPorcentaje ? `${v}%` : v} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => {
                 const color = bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length];
                 if (i === nombresEjesY.length - 1 && nombresEjesY.length > 1) {
@@ -1588,8 +1615,8 @@ function LibroPublicoContent() {
               <PolarGrid gridType={bloque.tipoGrafica === 'radar_relleno' ? 'circle' : 'polygon'} stroke="#e7e5e4" />
               {!bloque.ocultarEjeX && <PolarAngleAxis dataKey="name" tick={{ fill: '#78716c', fontSize: 12 }} />}
               <PolarRadiusAxis angle={30} domain={dominioNumerico} tick={{ fill: '#a8a29e', fontSize: 10 }} />
-              <RechartsTooltip formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-              {!bloque.ocultarLeyenda && <Legend formatter={(v) => String(v).replace(/․/g, '.')} wrapperStyle={{ paddingTop: '20px' }} />}
+              <RechartsTooltip itemSorter={ordenarTooltipSegunSeleccion} formatter={(value: any, name: any) => [formatearEtiqueta(value, String(name)), String(name).replace(/․/g, '.')]} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+              {!bloque.ocultarLeyenda && <Legend content={(props) => renderizarLeyendaEnOrden(props, nombresEjesY, paletaActiva, bloque)} />}
               {nombresEjesY.map((nombre, i) => (
                 <Radar key={nombre} name={nombre} dataKey={nombre} stroke={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} strokeWidth={2.5} fill={bloque.coloresCustom?.[i] || paletaActiva[i % paletaActiva.length]} fillOpacity={bloque.tipoGrafica === 'radar_relleno' ? 0.75 : 0.5} isAnimationActive={false}>
                   {bloque.mostrarValores && <LabelList dataKey={nombre} position="top" formatter={(v: any) => formatearEtiqueta(v, nombre)} style={{ fill: '#292524', fontSize: 10, fontWeight: 'bold' }} />}
@@ -1823,8 +1850,21 @@ function LibroPublicoContent() {
                   >
                     {configuracion.imagenFondoPortada && (
                       <div className="absolute inset-0 z-0 overflow-hidden">
-                        <img src={configuracion.imagenFondoPortada} alt="Fondo Portada" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0" style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }} />
+                        <img 
+                          src={configuracion.imagenFondoPortada} 
+                          alt="Fondo Portada" 
+                          className="w-full h-full object-cover" 
+                          style={{ 
+                            filter: `brightness(${configuracion.portadaBgBrightness ?? 100}%) contrast(${configuracion.portadaBgContrast ?? 100}%) blur(${configuracion.portadaBgBlur ?? 2}px)` 
+                          }}
+                        />
+                        <div 
+                          className="absolute inset-0" 
+                          style={{ 
+                            backgroundColor: configuracion.colorFondoPortada || '#fdfbf7',
+                            opacity: (configuracion.portadaBgOverlayOpacity ?? 85) / 100
+                          }} 
+                        />
                       </div>
                     )}
                     <div className="relative z-10 flex flex-col items-center w-full">
@@ -2130,11 +2170,21 @@ function LibroPublicoContent() {
                 className="h-full w-screen shrink-0 flex flex-col items-center justify-center text-center px-6 md:px-20 relative overflow-y-auto overflow-x-hidden custom-scrollbar"
               >
                 {configuracion.imagenFondoPortada && (
-                  <div className="absolute inset-0 z-0">
-                    <img src={configuracion.imagenFondoPortada} alt="Fondo" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 z-0 overflow-hidden">
+                    <img 
+                      src={configuracion.imagenFondoPortada} 
+                      alt="Fondo" 
+                      className="w-full h-full object-cover transition-all" 
+                      style={{ 
+                        filter: `brightness(${configuracion.portadaBgBrightness ?? 100}%) contrast(${configuracion.portadaBgContrast ?? 100}%) blur(${configuracion.portadaBgBlur ?? 2}px)` 
+                      }}
+                    />
                     <div 
-                      className="absolute inset-0 backdrop-blur-[2px]" 
-                      style={{ backgroundColor: `${configuracion.colorFondoPortada || '#fdfbf7'}D9` }}
+                      className="absolute inset-0 transition-all" 
+                      style={{ 
+                        backgroundColor: configuracion.colorFondoPortada || '#fdfbf7',
+                        opacity: (configuracion.portadaBgOverlayOpacity ?? 85) / 100
+                      }}
                     ></div>
                   </div>
                 )}
