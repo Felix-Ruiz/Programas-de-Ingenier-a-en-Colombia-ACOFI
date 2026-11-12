@@ -1005,7 +1005,7 @@ export default function AdminPage() {
     }
   };
 
-  // FUNCIÓN QUE EJECUTA EL GUARDADO REAL EN SUPABASE (Y CREA UN BACKUP PREVIO EN ediciones_backups) SOLO TRAS TU CONFIRMACIÓN
+  // FUNCIÓN QUE EJECUTA EL GUARDADO REAL EN SUPABASE (Y CREA UN BACKUP AUTOMÁTICO EN ediciones_backups) SOLO TRAS TU CONFIRMACIÓN
   const ejecutarGuardadoConfirmadoEnSupabase = async () => {
     if (!edicionActiva) return;
     setModalConfirmacion(prev => ({ ...prev, abierto: false }));
@@ -1013,19 +1013,6 @@ export default function AdminPage() {
     setEstadoGuardadoVivo('guardando');
     try {
       const jsonToSave = JSON.stringify({ paginas, configuracion });
-
-      if (edicionActiva.contenido_presentacion && edicionActiva.contenido_presentacion !== jsonToSave) {
-        try {
-          await supabase.from('ediciones_backups').insert([{
-            edicion_id: edicionActiva.id,
-            anio: edicionActiva.anio,
-            titulo: edicionActiva.titulo,
-            contenido_presentacion: edicionActiva.contenido_presentacion
-          }]);
-        } catch (errBackup) {
-          // Si el trigger SQL ya lo respalda, continúa sin bloquear
-        }
-      }
 
       const { error } = await supabase.from('ediciones').update({
         titulo: edicionActiva.titulo,
@@ -1046,7 +1033,7 @@ export default function AdminPage() {
         localStorage.removeItem(`acofi_borrador_pendiente_${edicionActiva.id}`);
       } catch (e) {}
 
-      mostrarMensaje(`¡Edición ${edicionActiva.anio} guardada y respaldada en Supabase exitosamente!`, 'exito');
+      mostrarMensaje(`¡Edición ${edicionActiva.anio} guardada y respaldada en Backups de Supabase exitosamente!`, 'exito');
     } catch (err: any) {
       setEstadoGuardadoVivo('escribiendo');
       mostrarMensaje(`Error al guardar en Supabase: ${err.message}`, 'error');
