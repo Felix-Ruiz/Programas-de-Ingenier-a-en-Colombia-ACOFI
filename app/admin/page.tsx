@@ -580,6 +580,9 @@ type ConfiguracionEdicion = {
   piePaginaGlobalHtml?: string;
   mostrarCabeceraGlobal?: boolean;
   mostrarPiePaginaGlobal?: boolean;
+  editorActivoId?: string;
+  editorActivoNombre?: string;
+  editorActivoTimestamp?: number;
 };
 
 // FUNCIÓN UNIVERSAL BLINDADA PARA CONVERTIR TEXTO DE EXCEL (TSV) O ARCHIVO CSV EN MATRIZ LIMPIA SIN FILAS/COLUMNAS FANTASMA
@@ -740,7 +743,7 @@ export default function AdminPage() {
   const [jsonLoteInput, setJsonLoteInput] = useState('');
   const [modoInsercionJson, setModoInsercionJson] = useState<'final' | 'despues_actual' | 'reemplazar'>('final');
 
-  // ESTADOS PARA HISTORIAL DE BACKUPS EN SUPABASE Y RECUPERACIÓN DE BORRADOR LOCAL
+  // ESTADOS PARA HISTORIAL DE BACKUPS EN SUPABASE Y CONTROL DE UN SOLO DISPOSITIVO EDITANDO A LA VEZ
   const [modalBackupsAbierto, setModalBackupsAbierto] = useState(false);
   const [listaBackups, setListaBackups] = useState<BackupEdicion[]>([]);
   const [cargandoBackups, setCargandoBackups] = useState(false);
@@ -749,6 +752,25 @@ export default function AdminPage() {
     paginas: Pagina[];
     configuracion: ConfiguracionEdicion;
   } | null>(null);
+
+  const [conflictoDispositivo, setConflictoDispositivo] = useState<{
+    detectado: boolean;
+    bloqueadoPorOtro: boolean;
+    nombreOtroDispositivo: string;
+    haceSegundos: number;
+    edicionPendiente: Edicion | null;
+  }>({
+    detectado: false,
+    bloqueadoPorOtro: false,
+    nombreOtroDispositivo: '',
+    haceSegundos: 0,
+    edicionPendiente: null
+  });
+
+  const deviceIdRef = useRef<string>('');
+  const nombreDispositivoRef = useRef<string>('Dispositivo');
+  const cargaInicialRealizadaRef = useRef<boolean>(false);
+  const edicionBloqueadaRef = useRef<boolean>(false);
 
   const [generandoPdfAdmin, setGenerandoPdfAdmin] = useState(false);
 
@@ -777,6 +799,22 @@ export default function AdminPage() {
 
   const generarId = () => Math.random().toString(36).substr(2, 9);
 
+  // INICIALIZAR IDENTIFICADOR ÚNICO DE ESTA PESTAÑA/DISPOSITIVO
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let idGuardado = sessionStorage.getItem('acofi_device_session_id');
+      if (!idGuardado) {
+        idGuardado = `dev_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        sessionStorage.setItem('acofi_device_session_id', idGuardado);
+      }
+      deviceIdRef.current = idGuardado;
+      const ua = navigator.userAgent || '';
+      const esMac = ua.includes('Mac');
+      const esWin = ua.includes('Win');
+      nombreDispositivoRef.current = esMac ? 'Mac' : esWin ? 'Windows PC' : 'Otro Dispositivo';
+    }
+  }, []);
+
   useEffect(() => {
     fetch('/colombia.json')
       .then(res => res.json())
@@ -784,32 +822,65 @@ export default function AdminPage() {
       .catch(() => {});
   }, []);
 
+  // BLINDADO: NUNCA RECARGA EDICIONES AL CAMBIAR DE PESTAÑA O REFRESCAR TOKEN (EVITA QUE SE BORREN CAMBIOS EN PANTALLA)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSesion(session);
       setRevisandoSesion(false);
-      if (session) cargarEdiciones();
+      if (session && !cargaInicialRealizadaRef.current) {
+        cargaInicialRealizadaRef.current = true;
+        cargarEdiciones();
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSesion(session);
-      if (session) cargarEdiciones();
+      if (event === 'SIGNED_OUT') {
+        cargaInicialRealizadaRef.current = false;
+      } else if (event === 'SIGNED_IN' && session && !cargaInicialRealizadaRef.current) {
+        cargaInicialRealizadaRef.current = true;
+        cargarEdiciones();
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // AVISO DEL NAVEGADOR SI SE INTENTA CERRAR LA PESTAÑA CON CAMBIOS PENDIENTES DE CONFIRMAR EN SUPABASE
+  // VIGILANTE DE DISPOSITIVO ÚNICO: VERIFICA CADA 12 SEGUNDOS SI OTRO DISPOSITIVO TOMÓ EL CONTROL
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (estadoGuardadoVivo === 'escribiendo') {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [estadoGuardadoVivo]);
+    if (!edicionActiva || !sesion) return;
+    const intervalo = setInterval(async () => {
+      if (edicionBloqueadaRef.current) return;
+      try {
+        const { data } = await supabase
+          .from('ediciones')
+          .select('contenido_presentacion')
+          .eq('id', edicionActiva.id)
+          .single();
+        if (data?.contenido_presentacion) {
+          const parsed = JSON.parse(data.contenido_presentacion);
+          const confRemota = parsed?.configuracion;
+          if (
+            confRemota?.editorActivoId &&
+            confRemota.editorActivoId !== deviceIdRef.current &&
+            confRemota.editorActivoTimestamp &&
+            Date.now() - confRemota.editorActivoTimestamp < 90000
+          ) {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            edicionBloqueadaRef.current = true;
+            setConflictoDispositivo({
+              detectado: true,
+              bloqueadoPorOtro: true,
+              nombreOtroDispositivo: confRemota.editorActivoNombre || 'Otro equipo',
+              haceSegundos: Math.max(1, Math.round((Date.now() - confRemota.editorActivoTimestamp) / 1000)),
+              edicionPendiente: null
+            });
+          }
+        }
+      } catch (e) {}
+    }, 12000);
+    return () => clearInterval(intervalo);
+  }, [edicionActiva?.id, sesion]);
 
   const manejarLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -838,7 +909,60 @@ export default function AdminPage() {
     }
   };
 
-  const cargarPaginasDesdeDB = (edicion: Edicion) => {
+  // RECLAMAR EL CANDADO DE EDICIÓN EXCLUSIVA PARA ESTE DISPOSITIVO Y RECARGAR DATOS FRESCOS DE SUPABASE
+  const tomarControlEnEsteDispositivo = async (edicionTarget?: Edicion) => {
+    const edUsar = edicionTarget || conflictoDispositivo.edicionPendiente || edicionActiva;
+    if (!edUsar) return;
+    setCargando(true);
+    try {
+      const { data, error } = await supabase
+        .from('ediciones')
+        .select('*')
+        .eq('id', edUsar.id)
+        .single();
+      const edFresca = (!error && data ? data : edUsar) as Edicion;
+
+      let pagsFrescas: Pagina[] = [];
+      let confFresca: ConfiguracionEdicion = { ...configuracion };
+      try {
+        const parsed = JSON.parse(edFresca.contenido_presentacion);
+        if (parsed && parsed.paginas) {
+          pagsFrescas = parsed.paginas;
+          confFresca = { ...confFresca, ...parsed.configuracion };
+        }
+      } catch (e) {}
+
+      const nuevaConfConCandado: ConfiguracionEdicion = {
+        ...confFresca,
+        editorActivoId: deviceIdRef.current,
+        editorActivoNombre: nombreDispositivoRef.current,
+        editorActivoTimestamp: Date.now()
+      };
+
+      const jsonConCandado = JSON.stringify({ paginas: pagsFrescas, configuracion: nuevaConfConCandado });
+      await supabase.from('ediciones').update({ contenido_presentacion: jsonConCandado }).eq('id', edFresca.id);
+
+      edicionBloqueadaRef.current = false;
+      setConflictoDispositivo({
+        detectado: false,
+        bloqueadoPorOtro: false,
+        nombreOtroDispositivo: '',
+        haceSegundos: 0,
+        edicionPendiente: null
+      });
+
+      const edActualizada = { ...edFresca, contenido_presentacion: jsonConCandado };
+      setEdicionActiva(edActualizada);
+      cargarPaginasDesdeDB(edActualizada, true);
+      mostrarMensaje(`Control de edición activo en este equipo (${nombreDispositivoRef.current}).`, 'exito');
+    } catch (err: any) {
+      mostrarMensaje(`Error al tomar el control: ${err.message}`, 'error');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const cargarPaginasDesdeDB = (edicion: Edicion, omitirChequeoCandado = false) => {
     let formatoBloques: Pagina[] = [];
     let configCargada: ConfiguracionEdicion = { 
       modoMarcaAgua: 'todas', 
@@ -888,33 +1012,41 @@ export default function AdminPage() {
         bloques: [{ id: generarId(), tipo: 'texto', contenido: edicion.contenido_presentacion || '' }] 
       }];
     }
+
+    // VERIFICAR SI OTRO DISPOSITIVO ESTÁ EDITANDO ESTA EDICIÓN AHORA MISMO (ÚLTIMOS 90 SEGUNDOS)
+    if (
+      !omitirChequeoCandado &&
+      configCargada.editorActivoId &&
+      deviceIdRef.current &&
+      configCargada.editorActivoId !== deviceIdRef.current &&
+      configCargada.editorActivoTimestamp &&
+      Date.now() - configCargada.editorActivoTimestamp < 90000
+    ) {
+      edicionBloqueadaRef.current = true;
+      setConflictoDispositivo({
+        detectado: true,
+        bloqueadoPorOtro: false,
+        nombreOtroDispositivo: configCargada.editorActivoNombre || 'Otro dispositivo',
+        haceSegundos: Math.max(1, Math.round((Date.now() - configCargada.editorActivoTimestamp) / 1000)),
+        edicionPendiente: edicion
+      });
+    } else {
+      edicionBloqueadaRef.current = false;
+      configCargada = {
+        ...configCargada,
+        editorActivoId: deviceIdRef.current,
+        editorActivoNombre: nombreDispositivoRef.current,
+        editorActivoTimestamp: Date.now()
+      };
+      // Registrar silenciosamente que este dispositivo tiene la sesión activa
+      const jsonLock = JSON.stringify({ paginas: formatoBloques, configuracion: configCargada });
+      supabase.from('ediciones').update({ contenido_presentacion: jsonLock }).eq('id', edicion.id).then(() => {});
+    }
     
     setPaginas(formatoBloques);
     setConfiguracion(configCargada);
     setEstadoGuardadoVivo('guardado');
-
-    // Detectar si existe un borrador local pendiente en este equipo para esta edición
-    try {
-      const rawPendiente = localStorage.getItem(`acofi_borrador_pendiente_${edicion.id}`);
-      if (rawPendiente) {
-        const parsedPendiente = JSON.parse(rawPendiente);
-        const jsonPendiente = JSON.stringify({ paginas: parsedPendiente.paginas, configuracion: parsedPendiente.configuracion });
-        const jsonActualDB = JSON.stringify({ paginas: formatoBloques, configuracion: configCargada });
-        if (parsedPendiente.paginas && jsonPendiente !== jsonActualDB) {
-          setBorradorLocalDetectado({
-            fecha: parsedPendiente.fecha || new Date().toLocaleTimeString(),
-            paginas: parsedPendiente.paginas,
-            configuracion: parsedPendiente.configuracion || configCargada
-          });
-        } else {
-          setBorradorLocalDetectado(null);
-        }
-      } else {
-        setBorradorLocalDetectado(null);
-      }
-    } catch (e) {
-      setBorradorLocalDetectado(null);
-    }
+    setBorradorLocalDetectado(null);
     
     const paginaGuardada = sessionStorage.getItem(`admin_pagina_${edicion.id}`);
     if (paginaGuardada && Number(paginaGuardada) < formatoBloques.length) {
@@ -950,29 +1082,12 @@ export default function AdminPage() {
     }
   };
 
-  const ejecutarCambioEdicionActiva = (ed: Edicion) => {
+  const cambiarEdicionActiva = (ed: Edicion) => {
+    if (edicionActiva?.id === ed.id) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
     setEdicionActiva(ed);
     sessionStorage.setItem('admin_edicion_activa', ed.id.toString());
     cargarPaginasDesdeDB(ed);
-  };
-
-  const cambiarEdicionActiva = (ed: Edicion) => {
-    if (edicionActiva?.id === ed.id) return;
-    if (estadoGuardadoVivo === 'escribiendo') {
-      setModalConfirmacion({
-        abierto: true,
-        titulo: 'Cambios sin confirmar en Supabase',
-        mensaje: `Tienes cambios en la edición ${edicionActiva?.anio} que aún no has confirmado en Supabase. ¿Deseas cambiar de edición de todos modos? (Tu borrador quedará respaldado localmente en este computador).`,
-        textoBotonConfirmar: 'Cambiar de Edición',
-        esPeligro: true,
-        accionConfirmar: () => {
-          setModalConfirmacion(prev => ({ ...prev, abierto: false }));
-          ejecutarCambioEdicionActiva(ed);
-        }
-      });
-      return;
-    }
-    ejecutarCambioEdicionActiva(ed);
   };
 
   const mostrarMensaje = (texto: string, tipo: 'exito' | 'error') => {
@@ -980,41 +1095,77 @@ export default function AdminPage() {
     setTimeout(() => setMensaje(null), 4000);
   };
 
-  // BLINDAJE TOTAL: autoGuardar NUNCA ESCRIBE EN SUPABASE AUTOMÁTICAMENTE.
-  // Solo actualiza el estado en pantalla y guarda un respaldo instantáneo en el localStorage de este computador.
-  // Supabase únicamente se actualiza cuando tú presionas el botón de Guardar y confirmas en el modal.
+  // AUTO-GUARDADO EN VIVO (CACHÉ LOCAL + REVISTA PÚBLICA AL INSTANTE, SIN TOCAR LA TABLA DE BACKUPS)
   const autoGuardar = (nuevasPaginas: Pagina[], nuevaConfig: ConfiguracionEdicion = configuracion) => {
     if (!edicionActiva) return;
+    if (edicionBloqueadaRef.current) {
+      mostrarMensaje('Edición bloqueada porque otro dispositivo tomó el control. Reclama el control para editar.', 'error');
+      return;
+    }
+
+    const configConCandado: ConfiguracionEdicion = {
+      ...nuevaConfig,
+      editorActivoId: deviceIdRef.current,
+      editorActivoNombre: nombreDispositivoRef.current,
+      editorActivoTimestamp: Date.now()
+    };
+
     setEstadoGuardadoVivo('escribiendo');
     setPaginas(nuevasPaginas);
-    setConfiguracion(nuevaConfig);
+    setConfiguracion(configConCandado);
 
-    if (timerRef.current) clearTimeout(timerRef.current);
+    const idEdicionGuardar = edicionActiva.id;
 
     try {
-      const borradorLocal = JSON.stringify({
-        fecha: new Date().toLocaleString('es-CO'),
-        edicionId: edicionActiva.id,
-        anio: edicionActiva.anio,
-        paginas: nuevasPaginas,
-        configuracion: nuevaConfig
-      });
-      localStorage.setItem(`acofi_borrador_pendiente_${edicionActiva.id}`, borradorLocal);
-    } catch (e) {
-      // Ignorar si localStorage alcanza su límite
-    }
+      localStorage.setItem(
+        `acofi_cache_vivo_${idEdicionGuardar}`,
+        JSON.stringify({
+          fecha: new Date().toLocaleString('es-CO'),
+          paginas: nuevasPaginas,
+          configuracion: configConCandado
+        })
+      );
+    } catch (e) {}
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      if (edicionBloqueadaRef.current) return;
+      setEstadoGuardadoVivo('guardando');
+      try {
+        const jsonToSave = JSON.stringify({ paginas: nuevasPaginas, configuracion: configConCandado });
+        const { error } = await supabase
+          .from('ediciones')
+          .update({ contenido_presentacion: jsonToSave })
+          .eq('id', idEdicionGuardar);
+        if (error) throw error;
+        setEdicionActiva(prev => (prev && prev.id === idEdicionGuardar ? { ...prev, contenido_presentacion: jsonToSave } : prev));
+        setEdiciones(prev => prev.map(e => (e.id === idEdicionGuardar ? { ...e, contenido_presentacion: jsonToSave } : e)));
+        setEstadoGuardadoVivo('guardado');
+      } catch (err: any) {
+        setEstadoGuardadoVivo('escribiendo');
+        mostrarMensaje(`Aviso al sincronizar en vivo: ${err?.message || 'Revisa tu conexión'}`, 'error');
+      }
+    }, 1000);
   };
 
-  // FUNCIÓN QUE EJECUTA EL GUARDADO REAL EN SUPABASE (Y CREA UN BACKUP AUTOMÁTICO EN ediciones_backups) SOLO TRAS TU CONFIRMACIÓN
+  // BOTÓN MANUAL EXCLUSIVO PARA CREAR UN BACKUP EN ediciones_backups Y FORZAR SINCRONIZACIÓN TOTAL
   const ejecutarGuardadoConfirmadoEnSupabase = async () => {
     if (!edicionActiva) return;
     setModalConfirmacion(prev => ({ ...prev, abierto: false }));
+    if (timerRef.current) clearTimeout(timerRef.current);
     setGuardando(true);
     setEstadoGuardadoVivo('guardando');
     try {
-      const jsonToSave = JSON.stringify({ paginas, configuracion });
+      const configConCandado: ConfiguracionEdicion = {
+        ...configuracion,
+        editorActivoId: deviceIdRef.current,
+        editorActivoNombre: nombreDispositivoRef.current,
+        editorActivoTimestamp: Date.now()
+      };
+      const jsonToSave = JSON.stringify({ paginas, configuracion: configConCandado });
 
-      const { error } = await supabase.from('ediciones').update({
+      // 1. Actualizar la edición en vivo
+      const { error: errorUpdate } = await supabase.from('ediciones').update({
         titulo: edicionActiva.titulo,
         anio: edicionActiva.anio,
         color_principal: edicionActiva.color_principal,
@@ -1022,35 +1173,41 @@ export default function AdminPage() {
         contenido_presentacion: jsonToSave
       }).eq('id', edicionActiva.id);
 
-      if (error) throw error;
+      if (errorUpdate) throw errorUpdate;
+
+      // 2. Insertar explícitamente el Backup con los cambios actuales exactos en ediciones_backups
+      const { error: errorBackup } = await supabase.from('ediciones_backups').insert([{
+        edicion_id: edicionActiva.id,
+        anio: edicionActiva.anio,
+        titulo: edicionActiva.titulo,
+        contenido_presentacion: jsonToSave
+      }]);
+
+      if (errorBackup) throw errorBackup;
 
       const edicionActualizada = { ...edicionActiva, contenido_presentacion: jsonToSave };
       setEdicionActiva(edicionActualizada);
       setEdiciones(prev => prev.map(e => e.id === edicionActiva.id ? edicionActualizada : e));
       setEstadoGuardadoVivo('guardado');
-      setBorradorLocalDetectado(null);
-      try {
-        localStorage.removeItem(`acofi_borrador_pendiente_${edicionActiva.id}`);
-      } catch (e) {}
 
-      mostrarMensaje(`¡Edición ${edicionActiva.anio} guardada y respaldada en Backups de Supabase exitosamente!`, 'exito');
+      mostrarMensaje(`¡Backup creado en la nube con éxito (${paginas.length} hojas)!`, 'exito');
     } catch (err: any) {
       setEstadoGuardadoVivo('escribiendo');
-      mostrarMensaje(`Error al guardar en Supabase: ${err.message}`, 'error');
+      mostrarMensaje(`Error al guardar Backup: ${err.message}`, 'error');
     } finally {
       setGuardando(false);
     }
   };
 
-  // MODAL DE CONFIRMACIÓN OBLIGATORIA ANTES DE ESCRIBIR EN SUPABASE
+  // ABRE EL MODAL PARA CONFIRMAR LA CREACIÓN DEL BACKUP MANUAL EN LA NUBE
   const solicitarConfirmacionGuardado = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!edicionActiva) return;
     setModalConfirmacion({
       abierto: true,
-      titulo: `Confirmar Guardado en Supabase (${edicionActiva.anio})`,
-      mensaje: `¿Confirmas que deseas subir y guardar en Supabase los cambios actuales de la Edición ${edicionActiva.anio} (${paginas.length} páginas)? Se guardará automáticamente una copia de seguridad previa en ediciones_backups.`,
-      textoBotonConfirmar: 'Sí, Guardar en Supabase',
+      titulo: `Crear Backup en Nube (${edicionActiva.anio})`,
+      mensaje: `¿Deseas guardar una copia de seguridad (Backup) del estado actual de la Edición ${edicionActiva.anio} (${paginas.length} páginas) en el historial de Supabase?`,
+      textoBotonConfirmar: 'Sí, Crear Backup Ahora',
       esPeligro: false,
       accionConfirmar: ejecutarGuardadoConfirmadoEnSupabase
     });
@@ -1078,7 +1235,7 @@ export default function AdminPage() {
     }
   };
 
-  // CARGAR UN BACKUP EN PANTALLA (NO SOBRESCRIBE SUPABASE HASTA QUE TÚ REVISES Y CONFIRMES EL GUARDADO)
+  // RESTAURAR UN BACKUP Y PUBLICARLO EN VIVO
   const restaurarBackupEnPantalla = (backup: BackupEdicion) => {
     try {
       const parsed = JSON.parse(backup.contenido_presentacion);
@@ -1091,7 +1248,7 @@ export default function AdminPage() {
       autoGuardar(pagsRestauradas, configRestaurada);
       cambiarPagina(0);
       setModalBackupsAbierto(false);
-      mostrarMensaje(`Backup del ${new Date(backup.created_at).toLocaleString('es-CO')} cargado en pantalla (${pagsRestauradas.length} hojas). Pulsa "Guardar en Supabase" para confirmarlo.`, 'exito');
+      mostrarMensaje(`Backup del ${new Date(backup.created_at).toLocaleString('es-CO')} restaurado (${pagsRestauradas.length} hojas).`, 'exito');
     } catch (err: any) {
       mostrarMensaje(`Error al leer el backup: ${err.message}`, 'error');
     }
@@ -1101,7 +1258,7 @@ export default function AdminPage() {
     const nuevasPaginas = paginas.map(p => ({ ...p, colorFondo: colorHex }));
     const nuevaConfig = { ...configuracion, colorFondoPaginasGlobal: colorHex };
     autoGuardar(nuevasPaginas, nuevaConfig);
-    mostrarMensaje(`Color ${colorHex} aplicado a las ${nuevasPaginas.length} páginas del libro. Pulsa "Guardar en Supabase" para confirmar.`, 'exito');
+    mostrarMensaje(`Color ${colorHex} aplicado a las ${nuevasPaginas.length} páginas del libro.`, 'exito');
   };
 
   const descargarRespaldoJson = () => {
@@ -1546,7 +1703,7 @@ export default function AdminPage() {
       cambiarPagina(nuevoIndiceIr);
       setJsonLoteInput('');
       setModalImportarJsonAbierto(false);
-      mostrarMensaje(`¡${paginasListas.length} página(s) inyectadas en pantalla! Pulsa "Guardar en Supabase" para confirmarlas.`, 'exito');
+      mostrarMensaje(`¡${paginasListas.length} página(s) inyectadas y guardadas con éxito!`, 'exito');
     } catch (err: any) {
       mostrarMensaje(`Error en el formato JSON: ${err.message}`, 'error');
     }
@@ -1559,22 +1716,28 @@ export default function AdminPage() {
     autoGuardar(paginas, nueva);
   };
 
-  // BLINDADO: NO ACTUALIZA SUPABASE EN VIVO SIN CONFIRMACIÓN
   const actualizarColorTema = async (colorHex: string) => {
-    if (!edicionActiva) return;
+    if (!edicionActiva || edicionBloqueadaRef.current) return;
     setEdicionActiva({ ...edicionActiva, color_principal: colorHex });
-    setEstadoGuardadoVivo('escribiendo');
+    try {
+      await supabase.from('ediciones').update({ color_principal: colorHex }).eq('id', edicionActiva.id);
+    } catch (err) {
+      console.error("Error al actualizar color tema:", err);
+    }
   };
 
-  // BLINDADO: NO ACTUALIZA SUPABASE EN VIVO SIN CONFIRMACIÓN
   const actualizarEstadoEdicion = async (nuevoEstado: 'publicado' | 'borrador') => {
-    if (!edicionActiva) return;
+    if (!edicionActiva || edicionBloqueadaRef.current) return;
     setEdicionActiva({ ...edicionActiva, estado: nuevoEstado });
-    setEstadoGuardadoVivo('escribiendo');
-    mostrarMensaje(`Estado cambiado en pantalla a: ${nuevoEstado.toUpperCase()}. Pulsa "Guardar en Supabase" para confirmarlo.`, 'exito');
+    try {
+      await supabase.from('ediciones').update({ estado: nuevoEstado }).eq('id', edicionActiva.id);
+      setEdiciones(prev => prev.map(e => e.id === edicionActiva.id ? { ...e, estado: nuevoEstado } : e));
+      mostrarMensaje(`Estado cambiado a: ${nuevoEstado.toUpperCase()}`, 'exito');
+    } catch (err: any) {
+      mostrarMensaje(`Error al cambiar estado: ${err.message}`, 'error');
+    }
   };
 
-  // BLINDADO: PIDE CONFIRMACIÓN ANTES DE GUARDAR EN SUPABASE
   const manejarGuardadoManual = async (e?: React.FormEvent) => {
     solicitarConfirmacionGuardado(e);
   };
@@ -4235,43 +4398,6 @@ export default function AdminPage() {
           {edicionActiva ? (
             <div className={`${menuLateralAbierto ? 'max-w-6xl' : 'max-w-full'} mx-auto p-6 lg:p-10 pb-32 transition-all duration-300`}>
               
-              {/* BANNER DE RECUPERACIÓN SI HAY UN BORRADOR LOCAL PENDIENTE DE SUBIR EN ESTE COMPUTADOR */}
-              {borradorLocalDetectado && (
-                <div className="mb-6 bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm animate-in fade-in">
-                  <div className="flex items-center gap-3 text-amber-950 text-xs font-medium">
-                    <AlertCircle size={20} className="text-amber-600 shrink-0" />
-                    <span>
-                      <strong>Borrador local detectado en este computador ({borradorLocalDetectado.fecha}):</strong> Tienes cambios en la Edición {edicionActiva.anio} ({borradorLocalDetectado.paginas.length} hojas) que aún no habías confirmado en Supabase.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaginas(borradorLocalDetectado.paginas);
-                        setConfiguracion(borradorLocalDetectado.configuracion);
-                        setEstadoGuardadoVivo('escribiendo');
-                        setBorradorLocalDetectado(null);
-                        mostrarMensaje('Borrador local cargado en pantalla. Revisa y pulsa "Guardar en Supabase" para confirmarlo.', 'exito');
-                      }}
-                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black cursor-pointer shadow-xs"
-                    >
-                      Restaurar Borrador en Pantalla
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try { localStorage.removeItem(`acofi_borrador_pendiente_${edicionActiva.id}`); } catch (e) {}
-                        setBorradorLocalDetectado(null);
-                      }}
-                      className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-amber-300 rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      Descartar
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6 border-b border-slate-200 pb-6">
                 <div className="flex items-start gap-4">
                   {!menuLateralAbierto && (
@@ -4307,14 +4433,10 @@ export default function AdminPage() {
                     type="button"
                     onClick={solicitarConfirmacionGuardado}
                     disabled={guardando}
-                    className={`flex items-center gap-2 text-sm font-black px-5 py-3 rounded-xl transition-all shadow-md cursor-pointer ${
-                      estadoGuardadoVivo === 'escribiendo'
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white ring-2 ring-blue-300'
-                        : 'bg-slate-900 hover:bg-slate-800 text-white'
-                    }`}
-                    title="Confirmar y guardar cambios en Supabase"
+                    className="flex items-center gap-2 text-sm font-black bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl transition-all shadow-md cursor-pointer"
+                    title="Guardar una copia de seguridad (Backup) del estado actual en Supabase"
                   >
-                    <Save size={18} /> <span>{guardando ? 'Guardando...' : 'Guardar en Supabase'}</span>
+                    <Save size={18} /> <span>{guardando ? 'Guardando Backup...' : 'Guardar Backup en Nube'}</span>
                   </button>
                   <button
                     type="button"
@@ -4322,7 +4444,7 @@ export default function AdminPage() {
                     className="flex items-center gap-2 text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-4 py-3 rounded-xl hover:bg-indigo-100 transition-all shadow-xs cursor-pointer"
                     title="Ver y restaurar copias de seguridad guardadas en Supabase"
                   >
-                    <Database size={18} className="text-indigo-600" /> <span>Backups</span>
+                    <Database size={18} className="text-indigo-600" /> <span>Ver Backups</span>
                   </button>
                   <button
                     type="button"
@@ -4377,7 +4499,7 @@ export default function AdminPage() {
                             onChange={(e) => {
                               const nuevo = { ...edicionActiva, titulo: e.target.value };
                               setEdicionActiva(nuevo);
-                              setEstadoGuardadoVivo('escribiendo');
+                              supabase.from('ediciones').update({ titulo: e.target.value }).eq('id', edicionActiva.id);
                             }} 
                             className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
                             required 
@@ -4418,7 +4540,7 @@ export default function AdminPage() {
                             value={edicionActiva.anio || ''} 
                             onChange={(e) => {
                                setEdicionActiva({ ...edicionActiva, anio: e.target.value });
-                               setEstadoGuardadoVivo('escribiendo');
+                               supabase.from('ediciones').update({ anio: e.target.value }).eq('id', edicionActiva.id);
                             }} 
                             className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-semibold text-lg outline-none focus:border-blue-500" 
                             required 
@@ -4773,7 +4895,7 @@ export default function AdminPage() {
               {pestañaActiva === 'contenido' && paginaActiva && (
                 <div className="animate-in fade-in duration-500">
                   
-                  {/* BARRA SUPERIOR DE NAVEGACIÓN DE PÁGINAS CON SALTO DIRECTO, DUPLICACIÓN Y GUARDADO CONFIRMADO */}
+                  {/* BARRA SUPERIOR DE NAVEGACIÓN DE PÁGINAS CON AUTO-GUARDADO EN CACHÉ Y BOTÓN DE BACKUP */}
                   <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-3 justify-between items-center mb-8 sticky top-4 z-40">
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-center md:justify-start">
                       <button onClick={() => cambiarPagina(Math.max(0, indicePaginaActual - 1))} disabled={indicePaginaActual === 0} className="p-2 hover:bg-slate-100 rounded-lg disabled:opacity-30 text-slate-600 cursor-pointer"><ChevronLeft size={20} /></button>
@@ -4836,22 +4958,19 @@ export default function AdminPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-center">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-2">
-                        {estadoGuardadoVivo === 'guardado' && <span className="flex items-center gap-1.5 text-emerald-600"><CheckCircle2 size={14} className="text-emerald-500" /> Sincronizado</span>}
-                        {estadoGuardadoVivo === 'escribiendo' && <span className="flex items-center gap-1.5 text-amber-600 animate-pulse"><AlertCircle size={14} className="text-amber-500" /> Sin confirmar</span>}
-                        {estadoGuardadoVivo === 'guardando' && <span className="flex items-center gap-1.5 text-blue-600"><RefreshCcw size={14} className="text-blue-500 animate-spin" /> Subiendo...</span>}
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-3">
+                        {estadoGuardadoVivo === 'guardado' && <><CheckCircle2 size={14} className="text-green-500" /> Guardado</>}
+                        {estadoGuardadoVivo === 'escribiendo' && <><Edit3 size={14} className="text-blue-500" /> Cambios...</>}
+                        {estadoGuardadoVivo === 'guardando' && <><RefreshCcw size={14} className="text-yellow-500 animate-spin" /> Nube</>}
                       </div>
                       <button
                         type="button"
                         onClick={solicitarConfirmacionGuardado}
                         disabled={guardando}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${
-                          estadoGuardadoVivo === 'escribiendo'
-                            ? 'bg-blue-600 hover:bg-blue-700 text-white ring-2 ring-blue-300'
-                            : 'bg-slate-800 hover:bg-slate-700 text-white'
-                        }`}
+                        className="px-3.5 py-2 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        title="Crear punto de restauración en ediciones_backups"
                       >
-                        <Save size={14} /> Guardar en Nube
+                        <Save size={14} /> Guardar Backup
                       </button>
                     </div>
                   </div>
@@ -6841,6 +6960,62 @@ export default function AdminPage() {
         </main>
       )}
 
+      {/* MODAL DE SEGURIDAD: UN SOLO DISPOSITIVO EDITANDO A LA VEZ */}
+      {conflictoDispositivo.detectado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+          <div className="bg-white rounded-3xl shadow-2xl border-2 border-amber-400 w-full max-w-lg relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="h-3 w-full bg-amber-500"></div>
+            <div className="p-8 space-y-5">
+              <div className="flex items-center gap-3 text-amber-700">
+                <div className="p-3 bg-amber-100 rounded-2xl">
+                  <Lock size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 leading-tight">
+                    {conflictoDispositivo.bloqueadoPorOtro
+                      ? 'Otro dispositivo tomó el control de la edición'
+                      : 'Sesión activa detectada en otro dispositivo'}
+                  </h3>
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mt-0.5">
+                    Equipo activo: {conflictoDispositivo.nombreOtroDispositivo} (hace {conflictoDispositivo.haceSegundos}s)
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-slate-700 leading-relaxed space-y-2">
+                {conflictoDispositivo.bloqueadoPorOtro ? (
+                  <p>
+                    Se inició la edición de esta revista en <strong>{conflictoDispositivo.nombreOtroDispositivo}</strong>. Para proteger tu información, esta ventana se ha bloqueado automáticamente y no sobrescribirá nada.
+                  </p>
+                ) : (
+                  <p>
+                    ⚠️ <strong>Atención:</strong> Hay otra sesión abierta editando en <strong>{conflictoDispositivo.nombreOtroDispositivo}</strong>. Si continúas y tomas el control aquí, <strong>se desconectará el otro dispositivo y se perderán los cambios en curso que no se hayan alcanzado a guardar allá</strong>.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={cerrarSesion}
+                  className="px-5 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 text-sm transition-colors cursor-pointer"
+                >
+                  Salir / Cerrar Sesión Aquí
+                </button>
+                <button
+                  type="button"
+                  onClick={() => tomarControlEnEsteDispositivo()}
+                  className="px-6 py-3 rounded-xl font-black text-white bg-amber-600 hover:bg-amber-700 text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Lock size={16} /> Tomar el Control en este Dispositivo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL PARA VER Y RESTAURAR EL HISTORIAL DE BACKUPS DE SUPABASE (ediciones_backups) */}
       {modalBackupsAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
@@ -6854,7 +7029,7 @@ export default function AdminPage() {
                     <Database size={22} className="text-indigo-600" /> Historial de Copias de Seguridad — Edición {edicionActiva?.anio}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Cada vez que confirmas un guardado en Supabase, la versión anterior queda respaldada aquí automáticamente.
+                    Puntos de restauración guardados manualmente con el botón &quot;Guardar Backup&quot;.
                   </p>
                 </div>
                 <button onClick={() => setModalBackupsAbierto(false)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={20} /></button>
@@ -6870,7 +7045,7 @@ export default function AdminPage() {
                   <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6">
                     <p className="text-sm font-bold text-slate-700 mb-1">Aún no hay puntos anteriores registrados para esta edición</p>
                     <p className="text-xs text-slate-500">
-                      En cuanto realices un cambio y presiones <strong>&quot;Guardar en Supabase&quot;</strong>, se creará aquí automáticamente el primer respaldo histórico.
+                      Presiona el botón <strong>&quot;Guardar Backup en Nube&quot;</strong> cuando quieras fijar un punto de restauración seguro.
                     </p>
                   </div>
                 ) : (
@@ -6900,7 +7075,7 @@ export default function AdminPage() {
                           onClick={() => restaurarBackupEnPantalla(bk)}
                           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0"
                         >
-                          Cargar en Pantalla
+                          Restaurar este Backup
                         </button>
                       </div>
                     );
